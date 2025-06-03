@@ -1,0 +1,62 @@
+# Git
+.git/
+.gitignore
+
+# Go
+*.test
+*.out
+vendor/
+go.work
+go.work.sum
+
+# Build artifacts
+youtube-transcript-mcp
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test
+*_test.go
+testdata/
+coverage.html
+coverage.out
+
+# Local development
+.env
+.env.local
+.env.*.local
+logs/
+data/
+tmp/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Misc
+Makefile
+*.log
+*.pid
