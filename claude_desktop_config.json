@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "youtube-transcript": {
+      "command": "go",
+      "args": ["run", "/path/youtube-mcp/cmd/server/main.go"],
+      "env": {
+        "PORT": "8080",
+        "LOG_LEVEL": "info",
+        "CACHE_ENABLED": "true",
+        "YOUTUBE_DEFAULT_LANGUAGES": "en,ja"
+      }
+    }
+  }
+}
