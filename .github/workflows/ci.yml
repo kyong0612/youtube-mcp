@@ -60,10 +60,6 @@ jobs:
       run: |
         .tools/bin/govulncheck ./...
         
-    - name: License check
-      continue-on-error: true
-      run: |
-        .tools/bin/go-licenses check ./... --allowed_licenses=MIT,Apache-2.0,BSD-3-Clause,BSD-2-Clause,ISC,MPL-2.0
 
   # Static analysis job
   static-analysis:
