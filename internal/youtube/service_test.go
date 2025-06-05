@@ -2,8 +2,8 @@ package youtube
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/youtube-transcript-mcp/internal/config"
 	"github.com/youtube-transcript-mcp/internal/models"
+	"golang.org/x/time/rate"
 )
 
 // Mock cache for testing
@@ -54,7 +55,7 @@ func (m *mockCache) Close() error {
 
 func TestExtractVideoID(t *testing.T) {
 	s := &Service{}
-	
+
 	tests := []struct {
 		name      string
 		input     string
@@ -121,7 +122,7 @@ func TestExtractVideoID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := s.extractVideoID(tt.input)
-			
+
 			if tt.expectErr {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -140,7 +141,7 @@ func TestExtractVideoID(t *testing.T) {
 
 func TestCleanTranscriptText(t *testing.T) {
 	s := &Service{}
-	
+
 	tests := []struct {
 		name     string
 		input    string
@@ -190,7 +191,7 @@ func TestCleanTranscriptText(t *testing.T) {
 
 func TestFormatSRTTime(t *testing.T) {
 	s := &Service{}
-	
+
 	tests := []struct {
 		seconds  float64
 		expected string
@@ -212,7 +213,7 @@ func TestFormatSRTTime(t *testing.T) {
 
 func TestFormatVTTTime(t *testing.T) {
 	s := &Service{}
-	
+
 	tests := []struct {
 		seconds  float64
 		expected string
@@ -234,7 +235,7 @@ func TestFormatVTTTime(t *testing.T) {
 
 func TestCountWords(t *testing.T) {
 	s := &Service{}
-	
+
 	tests := []struct {
 		text     string
 		expected int
@@ -257,7 +258,7 @@ func TestCountWords(t *testing.T) {
 
 func TestCalculateDuration(t *testing.T) {
 	s := &Service{}
-	
+
 	tests := []struct {
 		segments []models.TranscriptSegment
 		expected float64
@@ -292,7 +293,7 @@ func TestCalculateDuration(t *testing.T) {
 
 func TestSelectBestTrack(t *testing.T) {
 	s := &Service{}
-	
+
 	tracks := []CaptionTrack{
 		{LanguageCode: "en", IsDefault: true},
 		{LanguageCode: "ja"},
@@ -348,7 +349,7 @@ func TestSelectBestTrack(t *testing.T) {
 
 func TestGetTranscriptType(t *testing.T) {
 	s := &Service{}
-	
+
 	tests := []struct {
 		track    *CaptionTrack
 		expected string
@@ -377,7 +378,7 @@ func TestGetTranscriptType(t *testing.T) {
 
 func TestFormatAsPlainText(t *testing.T) {
 	s := &Service{}
-	
+
 	segments := []models.TranscriptSegment{
 		{Text: "Hello", Start: 0},
 		{Text: "world", Start: 2},
@@ -400,14 +401,14 @@ func TestFormatAsPlainText(t *testing.T) {
 
 func TestFormatAsSRT(t *testing.T) {
 	s := &Service{}
-	
+
 	segments := []models.TranscriptSegment{
 		{Text: "Hello", Start: 0, Duration: 2, End: 2},
 		{Text: "world", Start: 2, Duration: 3, End: 5},
 	}
 
 	result := s.formatAsSRT(segments)
-	
+
 	// Check for SRT format markers
 	if !strings.Contains(result, "1\n") {
 		t.Error("Expected sequence number")
@@ -422,14 +423,14 @@ func TestFormatAsSRT(t *testing.T) {
 
 func TestFormatAsVTT(t *testing.T) {
 	s := &Service{}
-	
+
 	segments := []models.TranscriptSegment{
 		{Text: "Hello", Start: 0, Duration: 2, End: 2},
 		{Text: "world", Start: 2, Duration: 3, End: 5},
 	}
 
 	result := s.formatAsVTT(segments)
-	
+
 	// Check for VTT format markers
 	if !strings.HasPrefix(result, "WEBVTT") {
 		t.Error("Expected WEBVTT header")
@@ -445,14 +446,14 @@ func TestProxyManager(t *testing.T) {
 		"http://proxy2.com:8080",
 		"http://proxy3.com:8080",
 	}
-	
+
 	pm := &ProxyManager{
 		proxies: proxies,
 	}
 
 	// Test rotation
 	req := httptest.NewRequest("GET", "http://example.com", nil)
-	
+
 	proxy1, err := pm.GetProxy(req)
 	if err != nil {
 		t.Fatalf("Failed to get proxy: %v", err)
@@ -470,7 +471,7 @@ func TestProxyManager(t *testing.T) {
 	}
 
 	// Test wrap around
-	pm.GetProxy(req) // third proxy
+	_, _ = pm.GetProxy(req) // third proxy
 	proxy4, err := pm.GetProxy(req)
 	if err != nil {
 		t.Fatalf("Failed to get proxy: %v", err)
@@ -489,12 +490,12 @@ func TestServiceWithCache(t *testing.T) {
 		RateLimitPerMinute: 60,
 		UserAgent:          "test-agent",
 	}
-	
+
 	mockCache := newMockCache()
 	logger := slog.Default()
-	
+
 	service := NewService(cfg, mockCache, logger)
-	
+
 	// Test that service is properly initialized
 	if service.config.UserAgent != "test-agent" {
 		t.Errorf("Expected user agent 'test-agent', got '%s'", service.config.UserAgent)
@@ -507,53 +508,249 @@ func TestServiceWithCache(t *testing.T) {
 	}
 }
 
-// Mock HTTP server for testing
-func setupMockServer() *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/watch":
-			// Return mock YouTube page
-			w.Write([]byte(`
-				<html>
-				<script>
-				var ytInitialPlayerResponse = {
-					"videoDetails": {
-						"videoId": "test123",
-						"title": "Test Video",
-						"shortDescription": "Test Description",
-						"channelId": "channel123",
-						"author": "Test Channel",
-						"viewCount": "1000",
-						"isLiveContent": false
-					},
-					"captions": {
-						"playerCaptionsTracklistRenderer": {
-							"captionTracks": [{
-								"baseUrl": "/api/timedtext?v=test123&lang=en",
-								"name": {"simpleText": "English"},
-								"vssId": "en",
-								"languageCode": "en",
-								"isTranslatable": true,
-								"isDefault": true
-							}]
-						}
+
+func TestParseTranscriptXML(t *testing.T) {
+	s := &Service{
+		logger: slog.Default(),
+	}
+
+	tests := []struct {
+		name        string
+		xmlData     string
+		expectError bool
+		expectCount int
+	}{
+		{
+			name: "standard transcript format",
+			xmlData: `<?xml version="1.0" encoding="utf-8"?>
+<transcript>
+	<text start="0" dur="2">Hello world</text>
+	<text start="2" dur="3">This is a test</text>
+</transcript>`,
+			expectError: false,
+			expectCount: 2,
+		},
+		{
+			name: "timedtext format with paragraphs",
+			xmlData: `<?xml version="1.0" encoding="utf-8"?>
+<timedtext>
+	<head>
+		<ws id="0"/>
+		<wp id="0"/>
+	</head>
+	<body>
+		<p t="0" d="2">
+			<s>Hello world</s>
+		</p>
+		<p t="2" d="3">
+			<s>This is a test</s>
+		</p>
+	</body>
+</timedtext>`,
+			expectError: false,
+			expectCount: 2,
+		},
+		{
+			name: "timedtext format with direct text elements",
+			xmlData: `<?xml version="1.0" encoding="utf-8"?>
+<timedtext>
+	<body>
+		<text start="0" dur="2">Hello world</text>
+		<text start="2" dur="3">This is a test</text>
+	</body>
+</timedtext>`,
+			expectError: false,
+			expectCount: 2,
+		},
+		{
+			name:        "empty XML",
+			xmlData:     "",
+			expectError: true,
+		},
+		{
+			name:        "whitespace only",
+			xmlData:     "   \n\t   ",
+			expectError: true,
+		},
+		{
+			name:        "invalid XML",
+			xmlData:     "<invalid><unclosed>",
+			expectError: true,
+		},
+		{
+			name: "segments with zero duration",
+			xmlData: `<?xml version="1.0" encoding="utf-8"?>
+<transcript>
+	<text start="0" dur="0">Hello world</text>
+	<text start="2" dur="0">This is a test</text>
+</transcript>`,
+			expectError: false,
+			expectCount: 2,
+		},
+		{
+			name: "HTML entities in text",
+			xmlData: `<?xml version="1.0" encoding="utf-8"?>
+<transcript>
+	<text start="0" dur="2">Hello &amp; world &lt;test&gt;</text>
+	<text start="2" dur="3">This is a &quot;test&quot;</text>
+</transcript>`,
+			expectError: false,
+			expectCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			segments, err := s.parseTranscriptXML([]byte(tt.xmlData))
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if len(segments) != tt.expectCount {
+				t.Errorf("Expected %d segments, got %d", tt.expectCount, len(segments))
+			}
+
+			// Verify segments have valid data
+			for i, segment := range segments {
+				if segment.Text == "" {
+					t.Errorf("Segment %d has empty text", i)
+				}
+				if segment.Duration <= 0 {
+					// Should have default duration of 2.0
+					if segment.Duration != 2.0 {
+						t.Errorf("Segment %d has invalid duration: %f", i, segment.Duration)
 					}
-				};
-				</script>
-				</html>
-			`))
-		case "/api/timedtext":
-			// Return mock transcript XML
-			w.Header().Set("Content-Type", "text/xml")
-			w.Write([]byte(`
-				<?xml version="1.0" encoding="utf-8"?>
-				<transcript>
-					<text start="0" dur="2">Hello world</text>
-					<text start="2" dur="3">This is a test</text>
-				</transcript>
-			`))
-		default:
-			w.WriteHeader(404)
+				}
+			}
+		})
+	}
+}
+
+func TestRetryLogic(t *testing.T) {
+	// Test retry with backoff
+	s := &Service{
+		config: config.YouTubeConfig{
+			RetryAttempts: 3,
+			RetryDelay:    10 * time.Millisecond,
+		},
+		logger: slog.Default(),
+	}
+
+	t.Run("successful operation on first try", func(t *testing.T) {
+		attempts := 0
+		err := s.retryWithBackoff(context.Background(), "test_op", func() error {
+			attempts++
+			return nil
+		})
+
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
 		}
-	}))
+		if attempts != 1 {
+			t.Errorf("Expected 1 attempt, got %d", attempts)
+		}
+	})
+
+	t.Run("successful operation after retries", func(t *testing.T) {
+		attempts := 0
+		err := s.retryWithBackoff(context.Background(), "test_op", func() error {
+			attempts++
+			if attempts < 3 {
+				return fmt.Errorf("timeout")
+			}
+			return nil
+		})
+
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if attempts != 3 {
+			t.Errorf("Expected 3 attempts, got %d", attempts)
+		}
+	})
+
+	t.Run("non-retryable error", func(t *testing.T) {
+		attempts := 0
+		err := s.retryWithBackoff(context.Background(), "test_op", func() error {
+			attempts++
+			return fmt.Errorf("invalid video id")
+		})
+
+		if err == nil {
+			t.Error("Expected error but got none")
+		}
+		if attempts != 1 {
+			t.Errorf("Expected 1 attempt, got %d", attempts)
+		}
+	})
+
+	t.Run("context cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+
+		err := s.retryWithBackoff(ctx, "test_op", func() error {
+			return fmt.Errorf("timeout")
+		})
+
+		if err != context.Canceled {
+			t.Errorf("Expected context.Canceled, got %v", err)
+		}
+	})
+}
+
+func TestAdaptiveRateLimit(t *testing.T) {
+	s := &Service{
+		config: config.YouTubeConfig{
+			RateLimitPerMinute: 60,
+			RateLimitPerHour:   1000,
+		},
+		logger: slog.Default(),
+		rateLimitState: &RateLimitState{
+			adaptiveMultiplier: 1.0,
+		},
+	}
+
+	// Initialize rate limiters
+	s.rateLimiter = rate.NewLimiter(rate.Every(time.Minute/time.Duration(s.config.RateLimitPerMinute)), s.config.RateLimitPerMinute)
+	s.hourlyLimiter = rate.NewLimiter(rate.Every(time.Hour/time.Duration(s.config.RateLimitPerHour)), s.config.RateLimitPerHour)
+
+	t.Run("success reduces multiplier", func(t *testing.T) {
+		// Set high multiplier
+		s.rateLimitState.adaptiveMultiplier = 3.0
+
+		s.recordRateLimitSuccess()
+
+		if s.rateLimitState.adaptiveMultiplier >= 3.0 {
+			t.Error("Expected multiplier to decrease")
+		}
+	})
+
+	t.Run("rate limit failure increases multiplier", func(t *testing.T) {
+		initialMultiplier := s.rateLimitState.adaptiveMultiplier
+
+		s.recordRateLimitFailure(fmt.Errorf("rate limit exceeded"))
+
+		if s.rateLimitState.adaptiveMultiplier <= initialMultiplier {
+			t.Error("Expected multiplier to increase")
+		}
+	})
+
+	t.Run("non-rate-limit failure doesn't affect multiplier", func(t *testing.T) {
+		initialMultiplier := s.rateLimitState.adaptiveMultiplier
+
+		s.recordRateLimitFailure(fmt.Errorf("network error"))
+
+		if s.rateLimitState.adaptiveMultiplier != initialMultiplier {
+			t.Error("Expected multiplier to remain unchanged")
+		}
+	})
 }
