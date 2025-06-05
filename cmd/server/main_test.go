@@ -17,14 +17,14 @@ import (
 
 func TestMain(m *testing.M) {
 	// Setup test environment
-	os.Setenv("PORT", "0") // Use random port for testing
+	os.Setenv("PORT", "0")          // Use random port for testing
 	os.Setenv("LOG_LEVEL", "error") // Reduce log noise
 	os.Setenv("CACHE_ENABLED", "true")
 	os.Setenv("MCP_REQUEST_TIMEOUT", "5s")
-	
+
 	// Run tests
 	code := m.Run()
-	
+
 	// Cleanup
 	os.Exit(code)
 }
@@ -32,18 +32,18 @@ func TestMain(m *testing.M) {
 func TestServerStartup(t *testing.T) {
 	// Test that server can start without errors
 	// This is a basic smoke test
-	
+
 	// In a real test, we'd refactor main() to be testable
 	// For now, this is a placeholder that tests the concept
-	
+
 	done := make(chan bool, 1)
-	
+
 	go func() {
 		// Simulate server startup
 		time.Sleep(50 * time.Millisecond)
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		// Server started successfully
@@ -55,18 +55,18 @@ func TestServerStartup(t *testing.T) {
 func TestHealthEndpoint(t *testing.T) {
 	// Create a test router with health endpoint
 	router := setupTestRouter()
-	
+
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
-	
+
 	router.ServeHTTP(w, req)
-	
+
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, "healthy", response["status"])
 	assert.Contains(t, response, "timestamp")
 	assert.Contains(t, response, "version")
@@ -75,18 +75,18 @@ func TestHealthEndpoint(t *testing.T) {
 func TestReadyEndpoint(t *testing.T) {
 	// Create a test router with ready endpoint
 	router := setupTestRouter()
-	
+
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	w := httptest.NewRecorder()
-	
+
 	router.ServeHTTP(w, req)
-	
+
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, "ready", response["status"])
 	assert.Contains(t, response, "timestamp")
 }
@@ -94,7 +94,7 @@ func TestReadyEndpoint(t *testing.T) {
 func TestMCPEndpointIntegration(t *testing.T) {
 	// Create a test router with MCP endpoint
 	router := setupTestRouter()
-	
+
 	tests := []struct {
 		name           string
 		request        models.MCPRequest
@@ -149,24 +149,24 @@ func TestMCPEndpointIntegration(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			body, err := json.Marshal(tt.request)
 			require.NoError(t, err)
-			
+
 			req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
-			
+
 			router.ServeHTTP(w, req)
-			
+
 			assert.Equal(t, tt.expectedStatus, w.Code)
-			
+
 			var response models.MCPResponse
 			err = json.Unmarshal(w.Body.Bytes(), &response)
 			require.NoError(t, err)
-			
+
 			tt.checkResponse(t, response)
 		})
 	}
@@ -174,14 +174,14 @@ func TestMCPEndpointIntegration(t *testing.T) {
 
 func TestCORSHeaders(t *testing.T) {
 	router := setupTestRouter()
-	
+
 	// Test OPTIONS request
 	req := httptest.NewRequest(http.MethodOptions, "/mcp", nil)
 	req.Header.Set("Origin", "http://example.com")
 	w := httptest.NewRecorder()
-	
+
 	router.ServeHTTP(w, req)
-	
+
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "*", w.Header().Get("Access-Control-Allow-Origin"))
 	assert.Contains(t, w.Header().Get("Access-Control-Allow-Methods"), "POST")
@@ -191,7 +191,7 @@ func TestCORSHeaders(t *testing.T) {
 func TestGracefulShutdown(t *testing.T) {
 	// This test would require refactoring main() to be more testable
 	// For now, we'll test the concept
-	
+
 	server := &http.Server{
 		Addr: ":0",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -200,15 +200,15 @@ func TestGracefulShutdown(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		}),
 	}
-	
+
 	// Start server
 	go server.ListenAndServe()
 	time.Sleep(50 * time.Millisecond)
-	
+
 	// Shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	
+
 	err := server.Shutdown(ctx)
 	assert.NoError(t, err)
 }
@@ -248,7 +248,7 @@ func TestEnvironmentConfiguration(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Save original values
@@ -256,15 +256,15 @@ func TestEnvironmentConfiguration(t *testing.T) {
 			for k := range tt.envVars {
 				originals[k] = os.Getenv(k)
 			}
-			
+
 			// Set test values
 			for k, v := range tt.envVars {
 				os.Setenv(k, v)
 			}
-			
+
 			// Validate
 			tt.validate(t)
-			
+
 			// Restore original values
 			for k, v := range originals {
 				if v == "" {
@@ -279,11 +279,11 @@ func TestEnvironmentConfiguration(t *testing.T) {
 
 func TestConcurrentRequests(t *testing.T) {
 	router := setupTestRouter()
-	
+
 	// Number of concurrent requests
 	numRequests := 10
 	done := make(chan bool, numRequests)
-	
+
 	for i := 0; i < numRequests; i++ {
 		go func(id int) {
 			request := models.MCPRequest{
@@ -291,19 +291,19 @@ func TestConcurrentRequests(t *testing.T) {
 				ID:      id,
 				Method:  models.MCPMethodListTools,
 			}
-			
+
 			body, _ := json.Marshal(request)
 			req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
-			
+
 			router.ServeHTTP(w, req)
-			
+
 			assert.Equal(t, http.StatusOK, w.Code)
 			done <- true
 		}(i)
 	}
-	
+
 	// Wait for all requests to complete
 	for i := 0; i < numRequests; i++ {
 		select {
@@ -318,7 +318,7 @@ func TestConcurrentRequests(t *testing.T) {
 func TestRequestTimeout(t *testing.T) {
 	// This test would require a custom handler that can simulate slow operations
 	// For now, we'll test the concept
-	
+
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		select {
@@ -328,34 +328,34 @@ func TestRequestTimeout(t *testing.T) {
 			w.WriteHeader(http.StatusRequestTimeout)
 		}
 	})
-	
+
 	req := httptest.NewRequest(http.MethodGet, "/slow", nil)
 	ctx, cancel := context.WithTimeout(req.Context(), 100*time.Millisecond)
 	defer cancel()
 	req = req.WithContext(ctx)
-	
+
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
-	
+
 	assert.Equal(t, http.StatusRequestTimeout, w.Code)
 }
 
 func TestInvalidJSONRequest(t *testing.T) {
 	router := setupTestRouter()
-	
+
 	// Send invalid JSON
 	req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader([]byte("invalid json")))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-	
+
 	router.ServeHTTP(w, req)
-	
+
 	assert.Equal(t, http.StatusOK, w.Code) // MCP returns 200 even for errors
-	
+
 	var response models.MCPResponse
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
-	
+
 	assert.NotNil(t, response.Error)
 	assert.Equal(t, models.MCPErrorCodeParseError, response.Error.Code)
 }
@@ -367,7 +367,7 @@ func setupTestRouter() http.Handler {
 	// This would be extracted from main.go
 	// For now, we'll create a minimal router
 	mux := http.NewServeMux()
-	
+
 	// Health endpoints
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -376,14 +376,14 @@ func setupTestRouter() http.Handler {
 			"version":   "1.0.0",
 		})
 	})
-	
+
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":    "ready",
 			"timestamp": time.Now().UTC(),
 		})
 	})
-	
+
 	// MCP endpoint (simplified)
 	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
 		var request models.MCPRequest
@@ -397,7 +397,7 @@ func setupTestRouter() http.Handler {
 			})
 			return
 		}
-		
+
 		// Simple response for testing
 		json.NewEncoder(w).Encode(models.MCPResponse{
 			JSONRPC: "2.0",
@@ -405,7 +405,7 @@ func setupTestRouter() http.Handler {
 			Result:  map[string]interface{}{"status": "ok"},
 		})
 	})
-	
+
 	// Wrap with CORS middleware
 	return corsWrapper(mux)
 }
@@ -415,12 +415,12 @@ func corsWrapper(handler http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		
+
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		
+
 		handler.ServeHTTP(w, r)
 	})
 }

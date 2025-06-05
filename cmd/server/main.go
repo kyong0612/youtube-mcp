@@ -10,9 +10,9 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"syscall"
-	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -33,8 +33,8 @@ var (
 
 // Global server state
 type serverState struct {
-	ready        atomic.Bool
-	healthy      atomic.Bool
+	ready         atomic.Bool
+	healthy       atomic.Bool
 	healthChecker *health.Checker
 }
 
@@ -88,7 +88,7 @@ func main() {
 		logger.Info("HTTP server starting", slog.String("address", srv.Addr))
 		state.healthy.Store(true)
 		state.ready.Store(true)
-		
+
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("Server failed to start", slog.Any("error", err))
 			os.Exit(1)
@@ -99,17 +99,17 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-ticker.C:
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				healthStatus := state.healthChecker.CheckHealth(ctx)
 				cancel()
-				
+
 				// Update server state based on health checks
 				state.healthy.Store(healthStatus.Status != "unhealthy")
-				
+
 				if healthStatus.Status != "healthy" {
 					logger.Warn("Health check detected issues",
 						slog.String("status", healthStatus.Status),
@@ -148,7 +148,7 @@ func main() {
 func setupLogger(cfg config.LoggingConfig) *slog.Logger {
 	var handler slog.Handler
 	opts := &slog.HandlerOptions{
-		Level: parseLogLevel(cfg.Level),
+		Level:     parseLogLevel(cfg.Level),
 		AddSource: cfg.EnableCaller,
 	}
 
@@ -226,15 +226,15 @@ func setupHTTPServer(cfg *config.Config, mcpServer *mcp.Server, logger *slog.Log
 	router.Use(middleware.RealIP)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.Timeout(cfg.Server.ReadTimeout))
-	
+
 	// Custom middleware
 	router.Use(loggingMiddleware(logger))
 	router.Use(metricsMiddleware())
-	
+
 	if cfg.Server.EnableCORS {
 		router.Use(corsMiddleware(cfg.Server.CORSOrigins))
 	}
-	
+
 	if cfg.Server.EnableGzip {
 		router.Use(middleware.Compress(5))
 	}
@@ -263,7 +263,7 @@ func setupHTTPServer(cfg *config.Config, mcpServer *mcp.Server, logger *slog.Log
 	// API endpoints (future expansion)
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Use(middleware.SetHeader("Content-Type", "application/json"))
-		
+
 		// Stats endpoint
 		r.Get("/stats", func(w http.ResponseWriter, r *http.Request) {
 			stats := mcpServer.GetStats()
@@ -297,7 +297,7 @@ func loggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-			
+
 			defer func() {
 				logger.Info("HTTP request",
 					slog.String("method", r.Method),
@@ -310,7 +310,7 @@ func loggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 					slog.String("request_id", middleware.GetReqID(r.Context())),
 				)
 			}()
-			
+
 			next.ServeHTTP(ww, r)
 		})
 	}
@@ -330,7 +330,7 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
 			allowed := false
-			
+
 			// Check if origin is allowed
 			for _, allowedOrigin := range allowedOrigins {
 				if allowedOrigin == "*" || allowedOrigin == origin {
@@ -338,19 +338,19 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 					break
 				}
 			}
-			
+
 			if allowed {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 				w.Header().Set("Access-Control-Max-Age", "86400")
 			}
-			
+
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
 				return
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -362,12 +362,12 @@ func rateLimitMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Hand
 		lastSeen time.Time
 		count    int
 	}
-	
+
 	var (
 		visitors = make(map[string]*visitor)
 		mu       = &sync.RWMutex{}
 	)
-	
+
 	// Cleanup old entries periodically
 	go func() {
 		for {
@@ -381,11 +381,11 @@ func rateLimitMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Hand
 			mu.Unlock()
 		}
 	}()
-	
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := r.RemoteAddr
-			
+
 			mu.Lock()
 			v, exists := visitors[ip]
 			if !exists {
@@ -394,7 +394,7 @@ func rateLimitMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Hand
 				next.ServeHTTP(w, r)
 				return
 			}
-			
+
 			// Reset count if window has passed
 			if time.Since(v.lastSeen) > cfg.RateLimitWindow {
 				v.count = 1
@@ -403,7 +403,7 @@ func rateLimitMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Hand
 				next.ServeHTTP(w, r)
 				return
 			}
-			
+
 			// Check rate limit
 			if v.count >= cfg.RateLimitPerIP {
 				mu.Unlock()
@@ -414,11 +414,11 @@ func rateLimitMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Hand
 				})
 				return
 			}
-			
+
 			v.count++
 			v.lastSeen = time.Now()
 			mu.Unlock()
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -432,13 +432,13 @@ func authMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			
+
 			// Check API key
 			apiKey := r.Header.Get("Authorization")
 			if apiKey == "" {
 				apiKey = r.URL.Query().Get("api_key")
 			}
-			
+
 			if apiKey == "" {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
@@ -447,7 +447,7 @@ func authMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Handler {
 				})
 				return
 			}
-			
+
 			// Validate API key
 			valid := false
 			for _, key := range cfg.APIKeys {
@@ -456,7 +456,7 @@ func authMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Handler {
 					break
 				}
 			}
-			
+
 			if !valid {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
@@ -465,7 +465,7 @@ func authMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Handler {
 				})
 				return
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -479,10 +479,10 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	// Perform health checks
 	ctx := r.Context()
 	healthStatus := state.healthChecker.CheckHealth(ctx)
-	
+
 	// Add version to response
 	healthStatus.Version = Version
-	
+
 	// Determine status code
 	statusCode := http.StatusOK
 	if healthStatus.Status == "unhealthy" {
@@ -490,7 +490,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	} else if healthStatus.Status == "degraded" {
 		statusCode = http.StatusOK // Still return 200 for degraded
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(healthStatus)
@@ -499,20 +499,20 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 func handleReady(w http.ResponseWriter, r *http.Request) {
 	// Check if service is ready
 	isReady := state.healthChecker.IsReady()
-	
+
 	status := "ready"
 	statusCode := http.StatusOK
-	
+
 	if !isReady || !state.ready.Load() {
 		status = "not ready"
 		statusCode = http.StatusServiceUnavailable
 	}
-	
+
 	response := map[string]interface{}{
 		"status":    status,
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(response)
@@ -527,7 +527,7 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 		"os":         runtime.GOOS,
 		"arch":       runtime.GOARCH,
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -539,24 +539,24 @@ func handleOptions(w http.ResponseWriter, r *http.Request) {
 // startMetricsServer starts a separate metrics server
 func startMetricsServer(cfg config.MetricsConfig, mcpServer *mcp.Server, logger *slog.Logger) {
 	mux := http.NewServeMux()
-	
+
 	// Metrics endpoint
 	mux.HandleFunc(cfg.Path, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		// Prometheus metrics would be exposed here
 		fmt.Fprintf(w, "# YouTube Transcript MCP Server Metrics\n")
 		fmt.Fprintf(w, "# TODO: Implement Prometheus metrics\n")
-		
+
 		// For now, return basic stats
 		stats := mcpServer.GetStats()
 		for key, value := range stats {
 			fmt.Fprintf(w, "youtube_transcript_mcp_%s %v\n", key, value)
 		}
 	})
-	
+
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	logger.Info("Starting metrics server", slog.String("address", addr))
-	
+
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		logger.Error("Metrics server failed", slog.Any("error", err))
 	}

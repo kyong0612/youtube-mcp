@@ -57,15 +57,15 @@ func TestDefaultConfig(t *testing.T) {
 func TestLoadWithEnvironmentVariables(t *testing.T) {
 	// Set test environment variables
 	testEnvVars := map[string]string{
-		"PORT":                     "9090",
-		"LOG_LEVEL":                "debug",
-		"YOUTUBE_API_KEY":          "test-api-key",
+		"PORT":                      "9090",
+		"LOG_LEVEL":                 "debug",
+		"YOUTUBE_API_KEY":           "test-api-key",
 		"YOUTUBE_DEFAULT_LANGUAGES": "en,fr,de",
-		"CACHE_ENABLED":            "false",
-		"CACHE_TYPE":               "redis",
-		"REDIS_URL":                "redis://test:6379",
-		"SECURITY_ENABLE_AUTH":     "true",
-		"SECURITY_API_KEYS":        "key1,key2,key3",
+		"CACHE_ENABLED":             "false",
+		"CACHE_TYPE":                "redis",
+		"REDIS_URL":                 "redis://test:6379",
+		"SECURITY_ENABLE_AUTH":      "true",
+		"SECURITY_API_KEYS":         "key1,key2,key3",
 	}
 
 	// Set environment variables
