@@ -1,0 +1,345 @@
+# golangci-lint configuration
+# See: https://golangci-lint.run/usage/configuration/
+
+run:
+  # Timeout for analysis
+  timeout: 10m
+  
+  # Exit code when at least one issue was found
+  issues-exit-code: 1
+  
+  # Include test files
+  tests: true
+  
+  # List of build tags
+  build-tags:
+    - integration
+  
+  # Which dirs to skip
+  skip-dirs:
+    - vendor
+    - third_party
+    - testdata
+    - examples
+    - .git
+    - .github
+  
+  # Which files to skip
+  skip-files:
+    - ".*\\.pb\\.go$"
+    - ".*\\.gen\\.go$"
+    - "mock_.*\\.go$"
+
+output:
+  # Colored output
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+  sort-results: true
+
+linters:
+  enable:
+    # Default linters
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    
+    # Additional linters
+    - bodyclose
+    - copyloopvar
+    - dogsled
+    - dupl
+    - durationcheck
+    - errorlint
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - gci
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - gofmt
+    - gofumpt
+    - goimports
+    - gomnd
+    - goprintffuncname
+    - gosec
+    - importas
+    - lll
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - noctx
+    - nolintlint
+    - paralleltest
+    - prealloc
+    - predeclared
+    - promlinter
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - stylecheck
+    - tenv
+    - testpackage
+    - tparallel
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+    
+  disable:
+    - depguard
+    - exhaustruct
+    - funlen
+    - gochecknoglobals
+    - godox
+    - goerr113
+    - goheader
+    - gomodguard
+    - ireturn
+    - nlreturn
+    - nonamedreturns
+    - tagliatelle
+    - testableexamples
+    - varnamelen
+    - wrapcheck
+    - wsl
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    
+  govet:
+    check-shadowing: true
+    enable-all: true
+    
+  gocyclo:
+    min-complexity: 15
+    
+  gocognit:
+    min-complexity: 20
+    
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+    
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+      
+  gofmt:
+    simplify: true
+    rewrite-rules:
+      - pattern: 'interface{}'
+        replacement: 'any'
+        
+  goimports:
+    local-prefixes: github.com/youtube-transcript-mcp
+    
+  gomnd:
+    settings:
+      mnd:
+        checks:
+          - argument
+          - case
+          - condition
+          - operation
+          - return
+          - assign
+        ignored-numbers:
+          - '0'
+          - '1'
+          - '2'
+          - '10'
+          - '100'
+          
+  gosec:
+    severity: medium
+    confidence: medium
+    excludes:
+      - G104  # Audit errors not checked
+      - G307  # Deferring unsafe method
+      
+  lll:
+    line-length: 120
+    tab-width: 4
+    
+  misspell:
+    locale: US
+    
+  nakedret:
+    max-func-lines: 30
+    
+  nestif:
+    min-complexity: 4
+    
+  nolintlint:
+    allow-unused: false
+    allow-leading-space: false
+    require-explanation: true
+    require-specific: true
+    
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: true
+    
+  revive:
+    ignore-generated-header: true
+    severity: warning
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+      
+  stylecheck:
+    go: "1.23"
+    checks: ["all", "-ST1003"]
+    dot-import-whitelist:
+      - fmt
+    initialisms:
+      - ACL
+      - API
+      - ASCII
+      - CPU
+      - CSS
+      - DNS
+      - EOF
+      - GUID
+      - HTML
+      - HTTP
+      - HTTPS
+      - ID
+      - IP
+      - JSON
+      - MCP
+      - QPS
+      - RAM
+      - RPC
+      - SLA
+      - SMTP
+      - SQL
+      - SSH
+      - TCP
+      - TLS
+      - TTL
+      - UDP
+      - UI
+      - GID
+      - UID
+      - UUID
+      - URI
+      - URL
+      - UTF8
+      - VM
+      - XML
+      - XMPP
+      - XSRF
+      - XSS
+      - YAML
+      
+  unparam:
+    check-exported: true
+    
+  unused:
+    check-exported: false
+
+issues:
+  # Maximum issues count per one linter
+  max-issues-per-linter: 0
+  
+  # Maximum count of issues with the same text
+  max-same-issues: 0
+  
+  # Exclude known false positives
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - dupl
+        - gomnd
+        - goconst
+        - testpackage
+        - paralleltest
+        - tparallel
+        
+    # Exclude some linters from running on main.go
+    - path: cmd/server/main\.go
+      linters:
+        - gochecknoinits
+        
+    # Exclude revive's package-comments for main packages
+    - path: cmd/.*/main\.go
+      linters:
+        - revive
+      text: "should have a package comment"
+      
+    # Exclude certain checks for generated files
+    - path: \.pb\.go
+      linters:
+        - gofmt
+        - goimports
+        - gocritic
+        - stylecheck
+        
+    # Allow complex functions in tests
+    - path: _test\.go
+      linters:
+        - gocognit
+        - gocyclo
+        - nestif
+        
+    # Allow dot imports in tests
+    - path: _test\.go
+      source: "\\.\\s+"
+      linters:
+        - revive
+        
+  # Fix found issues (if it's supported by the linter)
+  fix: true
+  
+  # Show all issues
+  exclude-use-default: false

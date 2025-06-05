@@ -1,0 +1,181 @@
+# .goreleaser.yml
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+
+# The lines below are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/need to use them.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+    # Run tests before release
+    - go test -v ./...
+
+builds:
+  - id: youtube-mcp
+    main: ./cmd/server
+    binary: youtube-mcp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.BuildTime={{.Date}}
+      - -X main.GitCommit={{.ShortCommit}}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  - id: youtube-mcp
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE*
+      - docs/*
+      - scripts/install-mcp.sh
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+  groups:
+    - title: 'Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Performance'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: 'Refactors'
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: Others
+      order: 999
+
+dockers:
+  - id: youtube-mcp
+    goos: linux
+    goarch: amd64
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/youtube-transcript-mcp:latest"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/youtube-transcript-mcp:{{ .Tag }}"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/youtube-transcript-mcp:{{ .Major }}"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/youtube-transcript-mcp:{{ .Major }}.{{ .Minor }}"
+    dockerfile: Dockerfile
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/amd64"
+
+nfpms:
+  - id: packages
+    package_name: youtube-mcp
+    vendor: YouTube Transcript MCP
+    homepage: https://github.com/kimkiyong/youtube-mcp
+    maintainer: Kim Kiyong <kimkiyong@example.com>
+    description: YouTube Transcript MCP Server
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - apk
+    dependencies:
+      - ca-certificates
+    bindir: /usr/bin
+    section: utils
+    priority: optional
+    contents:
+      - src: ./scripts/install-mcp.sh
+        dst: /usr/share/youtube-mcp/install-mcp.sh
+        file_info:
+          mode: 0755
+      - src: ./README.md
+        dst: /usr/share/doc/youtube-mcp/README.md
+        file_info:
+          mode: 0644
+
+brews:
+  - name: youtube-mcp
+    repository:
+      owner: kimkiyong
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: "https://github.com/kimkiyong/youtube-mcp"
+    description: "YouTube Transcript MCP Server"
+    license: "MIT"
+    skip_upload: auto
+    test: |
+      system "#{bin}/youtube-mcp", "--version"
+    install: |
+      bin.install "youtube-mcp"
+
+scoops:
+  - repository:
+      owner: kimkiyong
+      name: scoop-bucket
+      branch: main
+      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: "https://github.com/kimkiyong/youtube-mcp"
+    description: "YouTube Transcript MCP Server"
+    license: "MIT"
+    skip_upload: auto
+
+release:
+  github:
+    owner: kimkiyong
+    name: youtube-mcp
+  draft: false
+  prerelease: auto
+  mode: append
+  name_template: "{{.ProjectName}}-v{{.Version}}"
+  disable: false

@@ -1,0 +1,127 @@
+# Makefile for Go tools management with go.mod tool directive
+# This file manages development tools using Go 1.24's tool directive
+
+# Tools directory
+TOOLS_DIR := $(shell pwd)/.tools
+TOOLS_BIN := $(TOOLS_DIR)/bin
+export PATH := $(TOOLS_BIN):$(PATH)
+
+# Ensure tools directory exists
+$(TOOLS_BIN):
+	@mkdir -p $(TOOLS_BIN)
+
+# Install all tools using go tool directive
+.PHONY: tools
+tools: $(TOOLS_BIN) ## Install all development tools
+	@echo "Installing development tools..."
+	@echo "Downloading tool dependencies..."
+	@go mod download -x
+	@echo "Installing tools to $(TOOLS_BIN)..."
+	@GOBIN=$(TOOLS_BIN) go install github.com/air-verse/air
+	@GOBIN=$(TOOLS_BIN) go install github.com/git-chglog/git-chglog/cmd/git-chglog
+	@GOBIN=$(TOOLS_BIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint
+	@GOBIN=$(TOOLS_BIN) go install github.com/google/go-licenses
+	@GOBIN=$(TOOLS_BIN) go install github.com/gordonklaus/ineffassign
+	@GOBIN=$(TOOLS_BIN) go install github.com/mgechev/revive
+	@GOBIN=$(TOOLS_BIN) go install github.com/securego/gosec/v2/cmd/gosec
+	@GOBIN=$(TOOLS_BIN) go install github.com/sonatype-nexus-community/nancy
+	@GOBIN=$(TOOLS_BIN) go install golang.org/x/tools/cmd/goimports
+	@GOBIN=$(TOOLS_BIN) go install golang.org/x/tools/cmd/godoc
+	@GOBIN=$(TOOLS_BIN) go install golang.org/x/vuln/cmd/govulncheck
+	@GOBIN=$(TOOLS_BIN) go install honnef.co/go/tools/cmd/staticcheck
+	@echo "Tools installed successfully in $(TOOLS_BIN)"
+
+# Update tools to latest versions
+.PHONY: tools-update
+tools-update: ## Update all tools to latest versions
+	@echo "Updating tools..."
+	@go get -u \
+		github.com/air-verse/air \
+		github.com/git-chglog/git-chglog/cmd/git-chglog \
+		github.com/golangci/golangci-lint/cmd/golangci-lint \
+		github.com/google/go-licenses \
+		github.com/gordonklaus/ineffassign \
+		github.com/mgechev/revive \
+		github.com/securego/gosec/v2/cmd/gosec \
+		github.com/sonatype-nexus-community/nancy \
+		golang.org/x/tools/cmd/goimports \
+		golang.org/x/tools/cmd/godoc \
+		golang.org/x/vuln/cmd/govulncheck \
+		honnef.co/go/tools/cmd/staticcheck
+	@go mod tidy
+	@$(MAKE) tools
+	@echo "Tools updated successfully"
+
+# Clean tools
+.PHONY: tools-clean
+tools-clean: ## Remove installed tools
+	@echo "Cleaning tools..."
+	@rm -rf $(TOOLS_DIR)
+	@echo "Tools cleaned"
+
+# Verify tools are installed
+.PHONY: tools-verify
+tools-verify: ## Verify all tools are installed
+	@echo "Verifying tools..."
+	@test -f $(TOOLS_BIN)/air || (echo "air not found" && exit 1)
+	@test -f $(TOOLS_BIN)/git-chglog || (echo "git-chglog not found" && exit 1)
+	@test -f $(TOOLS_BIN)/golangci-lint || (echo "golangci-lint not found" && exit 1)
+	@test -f $(TOOLS_BIN)/go-licenses || (echo "go-licenses not found" && exit 1)
+	@test -f $(TOOLS_BIN)/ineffassign || (echo "ineffassign not found" && exit 1)
+	@test -f $(TOOLS_BIN)/revive || (echo "revive not found" && exit 1)
+	@test -f $(TOOLS_BIN)/gosec || (echo "gosec not found" && exit 1)
+	@test -f $(TOOLS_BIN)/nancy || (echo "nancy not found" && exit 1)
+	@test -f $(TOOLS_BIN)/goimports || (echo "goimports not found" && exit 1)
+	@test -f $(TOOLS_BIN)/godoc || (echo "godoc not found" && exit 1)
+	@test -f $(TOOLS_BIN)/govulncheck || (echo "govulncheck not found" && exit 1)
+	@test -f $(TOOLS_BIN)/staticcheck || (echo "staticcheck not found" && exit 1)
+	@echo "All tools verified successfully"
+
+# Individual tool installations
+.PHONY: install-air
+install-air: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install github.com/air-verse/air
+
+.PHONY: install-git-chglog
+install-git-chglog: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install github.com/git-chglog/git-chglog/cmd/git-chglog
+
+.PHONY: install-golangci-lint
+install-golangci-lint: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint
+
+.PHONY: install-go-licenses
+install-go-licenses: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install github.com/google/go-licenses
+
+.PHONY: install-ineffassign
+install-ineffassign: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install github.com/gordonklaus/ineffassign
+
+.PHONY: install-revive
+install-revive: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install github.com/mgechev/revive
+
+.PHONY: install-gosec
+install-gosec: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install github.com/securego/gosec/v2/cmd/gosec
+
+.PHONY: install-nancy
+install-nancy: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install github.com/sonatype-nexus-community/nancy
+
+.PHONY: install-goimports
+install-goimports: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install golang.org/x/tools/cmd/goimports
+
+.PHONY: install-godoc
+install-godoc: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install golang.org/x/tools/cmd/godoc
+
+.PHONY: install-govulncheck
+install-govulncheck: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install golang.org/x/vuln/cmd/govulncheck
+
+.PHONY: install-staticcheck
+install-staticcheck: $(TOOLS_BIN)
+	@GOBIN=$(TOOLS_BIN) go install honnef.co/go/tools/cmd/staticcheck
