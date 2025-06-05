@@ -508,7 +508,6 @@ func TestServiceWithCache(t *testing.T) {
 	}
 }
 
-
 func TestParseTranscriptXML(t *testing.T) {
 	s := &Service{
 		logger: slog.Default(),

@@ -12,6 +12,14 @@ BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo 'unknown')
 LDFLAGS := -ldflags "-w -s -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)"
 
+# Tools
+TOOLS_DIR := $(shell pwd)/.tools
+TOOLS_BIN := $(TOOLS_DIR)/bin
+export PATH := $(TOOLS_BIN):$(PATH)
+
+# Include tools makefile
+include Makefile.tools
+
 # Colors for output
 CYAN := \033[0;36m
 GREEN := \033[0;32m
@@ -29,7 +37,7 @@ help: ## Show this help message
 ##@ Development
 
 .PHONY: deps
-deps: ## Install Go dependencies
+deps: tools ## Install Go dependencies and tools
 	@echo "$(GREEN)Installing dependencies...$(NC)"
 	go mod download
 	go mod tidy
@@ -58,10 +66,9 @@ run: ## Run the application locally
 	go run $(LDFLAGS) ./cmd/server/main.go
 
 .PHONY: dev
-dev: ## Run in development mode with hot reload (requires air)
-	@which air > /dev/null || (echo "$(YELLOW)Installing air...$(NC)" && go install github.com/air-verse/air@latest)
+dev: install-air ## Run in development mode with hot reload
 	@echo "$(GREEN)Running in development mode...$(NC)"
-	air
+	$(TOOLS_BIN)/air
 
 .PHONY: clean
 clean: ## Clean build artifacts and caches
@@ -116,17 +123,15 @@ benchmark: ## Run benchmark tests
 ##@ Code Quality
 
 .PHONY: lint
-lint: ## Run linter (requires golangci-lint)
-	@which golangci-lint > /dev/null || (echo "$(YELLOW)Installing golangci-lint...$(NC)" && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
+lint: install-golangci-lint ## Run linter
 	@echo "$(GREEN)Running linter...$(NC)"
-	golangci-lint run
+	$(TOOLS_BIN)/golangci-lint run
 
 .PHONY: fmt
-fmt: ## Format code
+fmt: install-goimports ## Format code
 	@echo "$(GREEN)Formatting code...$(NC)"
 	go fmt ./...
-	@which goimports > /dev/null || go install golang.org/x/tools/cmd/goimports@latest
-	goimports -w .
+	$(TOOLS_BIN)/goimports -w .
 
 .PHONY: vet
 vet: ## Run go vet
@@ -134,10 +139,9 @@ vet: ## Run go vet
 	go vet ./...
 
 .PHONY: security
-security: ## Run security scan (requires gosec)
-	@which gosec > /dev/null || (echo "$(YELLOW)Installing gosec...$(NC)" && go install github.com/securego/gosec/v2/cmd/gosec@latest)
+security: install-gosec ## Run security scan
 	@echo "$(GREEN)Running security scan...$(NC)"
-	gosec -fmt=json -out=security-report.json ./... || true
+	$(TOOLS_BIN)/gosec -fmt=json -out=security-report.json ./... || true
 	@echo "$(GREEN)Security report generated: security-report.json$(NC)"
 
 .PHONY: mod-check
@@ -331,10 +335,9 @@ size: ## Show binary size
 	fi
 
 .PHONY: docs
-docs: ## Generate and serve documentation
+docs: install-godoc ## Generate and serve documentation
 	@echo "$(GREEN)Starting documentation server...$(NC)"
-	@which godoc > /dev/null || go install golang.org/x/tools/cmd/godoc@latest
-	godoc -http=:6060 &
+	$(TOOLS_BIN)/godoc -http=:6060 &
 	@echo "$(GREEN)Documentation available at http://localhost:6060$(NC)"
 
 .PHONY: docs-stop
@@ -368,10 +371,9 @@ release: clean test lint build-all ## Create a new release
 	@echo "$(GREEN)Release $(VERSION) created in releases/$(VERSION)$(NC)"
 
 .PHONY: changelog
-changelog: ## Generate changelog
+changelog: install-git-chglog ## Generate changelog
 	@echo "$(GREEN)Generating changelog...$(NC)"
-	@which git-chglog > /dev/null || go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
-	git-chglog -o CHANGELOG.md
+	$(TOOLS_BIN)/git-chglog -o CHANGELOG.md
 
 ##@ MCP Tools Testing
 

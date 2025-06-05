@@ -1,3 +1,4 @@
+// Package config provides configuration management for the YouTube MCP server.
 package config
 
 import (
