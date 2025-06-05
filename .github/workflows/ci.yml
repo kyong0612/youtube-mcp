@@ -229,9 +229,14 @@ jobs:
     - name: Build
       run: go build -v ./...
       
-    - name: Run unit tests
+    - name: Run unit tests (Unix)
+      if: matrix.os != 'windows-latest'
       run: |
         go test -v -race -short -shuffle=on -coverprofile=coverage.txt -covermode=atomic ./...
+        
+    - name: Run unit tests (Windows)
+      if: matrix.os == 'windows-latest'
+      run: go test -v -race -short -shuffle=on -coverprofile=coverage.txt -covermode=atomic ./...
         
     - name: Run tests with race detector
       if: matrix.os == 'ubuntu-latest'
