@@ -1,3 +1,4 @@
+// Package models defines data structures used throughout the application.
 package models
 
 import (

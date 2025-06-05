@@ -1,3 +1,4 @@
+// Package main implements the YouTube MCP server.
 package main
 
 import (

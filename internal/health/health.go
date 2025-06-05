@@ -1,3 +1,4 @@
+// Package health provides health check functionality for monitoring system components.
 package health
 
 import (
@@ -27,8 +28,8 @@ type CheckResult struct {
 	Details   map[string]interface{} `json:"details,omitempty"`
 }
 
-// HealthStatus represents the overall health status
-type HealthStatus struct {
+// Status represents the overall health status
+type Status struct {
 	Status    string                 `json:"status"` // "healthy", "degraded", "unhealthy"
 	Timestamp time.Time              `json:"timestamp"`
 	Version   string                 `json:"version"`
@@ -46,7 +47,7 @@ func NewChecker(cache cache.Cache, youtube *youtube.Service) *Checker {
 }
 
 // CheckHealth performs all health checks
-func (c *Checker) CheckHealth(ctx context.Context) *HealthStatus {
+func (c *Checker) CheckHealth(ctx context.Context) *Status {
 	start := time.Now()
 
 	// Run all checks in parallel
@@ -95,7 +96,7 @@ func (c *Checker) CheckHealth(ctx context.Context) *HealthStatus {
 		}
 	}
 
-	return &HealthStatus{
+	return &Status{
 		Status:    overallStatus,
 		Timestamp: time.Now().UTC(),
 		Checks:    results,
