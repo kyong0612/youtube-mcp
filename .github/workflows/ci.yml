@@ -236,6 +236,7 @@ jobs:
         
     - name: Run unit tests (Windows)
       if: matrix.os == 'windows-latest'
+      shell: cmd
       run: go test -v -race -short -shuffle=on -coverprofile=coverage.txt -covermode=atomic ./...
         
     - name: Run tests with race detector
