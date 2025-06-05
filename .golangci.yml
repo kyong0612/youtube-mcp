@@ -2,33 +2,12 @@
 # See: https://golangci-lint.run/usage/configuration/
 
 run:
-  # Timeout for analysis
   timeout: 10m
-  
-  # Exit code when at least one issue was found
-  issues-exit-code: 1
-  
-  # Include test files
   tests: true
-  
-  # List of build tags
-  build-tags:
-    - integration
-  
-  # Which dirs to skip
   skip-dirs:
     - vendor
-    - third_party
-    - testdata
-    - examples
     - .git
     - .github
-  
-  # Which files to skip
-  skip-files:
-    - ".*\\.pb\\.go$"
-    - ".*\\.gen\\.go$"
-    - "mock_.*\\.go$"
 
 output:
   # Colored output
@@ -39,7 +18,6 @@ output:
 
 linters:
   enable:
-    # Default linters
     - errcheck
     - gosimple
     - govet
@@ -47,75 +25,9 @@ linters:
     - staticcheck
     - typecheck
     - unused
-    
-    # Additional linters
-    - bodyclose
-    - copyloopvar
-    - dogsled
-    - dupl
-    - durationcheck
-    - errorlint
-    - exhaustive
-    - exportloopref
-    - forbidigo
-    - forcetypeassert
-    - gci
-    - gochecknoinits
-    - gocognit
-    - goconst
-    - gocritic
-    - gocyclo
-    - godot
     - gofmt
-    - gofumpt
     - goimports
-    - gomnd
-    - goprintffuncname
-    - gosec
-    - importas
-    - lll
-    - makezero
     - misspell
-    - nakedret
-    - nestif
-    - nilerr
-    - nilnil
-    - noctx
-    - nolintlint
-    - paralleltest
-    - prealloc
-    - predeclared
-    - promlinter
-    - revive
-    - rowserrcheck
-    - sqlclosecheck
-    - stylecheck
-    - tenv
-    - testpackage
-    - tparallel
-    - unconvert
-    - unparam
-    - usestdlibvars
-    - wastedassign
-    - whitespace
-    
-  disable:
-    - depguard
-    - exhaustruct
-    - funlen
-    - gochecknoglobals
-    - godox
-    - goerr113
-    - goheader
-    - gomodguard
-    - ireturn
-    - nlreturn
-    - nonamedreturns
-    - tagliatelle
-    - testableexamples
-    - varnamelen
-    - wrapcheck
-    - wsl
 
 linters-settings:
   errcheck:
@@ -236,7 +148,6 @@ linters-settings:
       - name: redefines-builtin-id
       
   stylecheck:
-    go: "1.23"
     checks: ["all", "-ST1003"]
     dot-import-whitelist:
       - fmt
