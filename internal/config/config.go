@@ -89,33 +89,33 @@ type CacheConfig struct {
 
 // SecurityConfig represents security configuration
 type SecurityConfig struct {
-	EnableAuth       bool     `json:"enable_auth"`
-	APIKeys          []string `json:"api_keys"`
-	JWTSecret        string   `json:"jwt_secret"`
-	JWTExpiry        time.Duration `json:"jwt_expiry"`
-	EnableRateLimit  bool     `json:"enable_rate_limit"`
-	RateLimitPerIP   int      `json:"rate_limit_per_ip"`
-	RateLimitWindow  time.Duration `json:"rate_limit_window"`
-	EnableIPWhitelist bool    `json:"enable_ip_whitelist"`
-	IPWhitelist      []string `json:"ip_whitelist"`
-	EnableIPBlacklist bool    `json:"enable_ip_blacklist"`
-	IPBlacklist      []string `json:"ip_blacklist"`
+	EnableAuth        bool          `json:"enable_auth"`
+	APIKeys           []string      `json:"api_keys"`
+	JWTSecret         string        `json:"jwt_secret"`
+	JWTExpiry         time.Duration `json:"jwt_expiry"`
+	EnableRateLimit   bool          `json:"enable_rate_limit"`
+	RateLimitPerIP    int           `json:"rate_limit_per_ip"`
+	RateLimitWindow   time.Duration `json:"rate_limit_window"`
+	EnableIPWhitelist bool          `json:"enable_ip_whitelist"`
+	IPWhitelist       []string      `json:"ip_whitelist"`
+	EnableIPBlacklist bool          `json:"enable_ip_blacklist"`
+	IPBlacklist       []string      `json:"ip_blacklist"`
 }
 
 // LoggingConfig represents logging configuration
 type LoggingConfig struct {
-	Level           string `json:"level"`
-	Format          string `json:"format"` // "json", "text"
-	Output          string `json:"output"` // "stdout", "stderr", "file"
-	FilePath        string `json:"file_path"`
-	MaxSizeMB       int    `json:"max_size_mb"`
-	MaxBackups      int    `json:"max_backups"`
-	MaxAgeDays      int    `json:"max_age_days"`
-	Compress        bool   `json:"compress"`
-	EnableCaller    bool   `json:"enable_caller"`
-	EnableStacktrace bool   `json:"enable_stacktrace"`
-	SamplingEnabled bool   `json:"sampling_enabled"`
-	SamplingRate    float64 `json:"sampling_rate"`
+	Level            string  `json:"level"`
+	Format           string  `json:"format"` // "json", "text"
+	Output           string  `json:"output"` // "stdout", "stderr", "file"
+	FilePath         string  `json:"file_path"`
+	MaxSizeMB        int     `json:"max_size_mb"`
+	MaxBackups       int     `json:"max_backups"`
+	MaxAgeDays       int     `json:"max_age_days"`
+	Compress         bool    `json:"compress"`
+	EnableCaller     bool    `json:"enable_caller"`
+	EnableStacktrace bool    `json:"enable_stacktrace"`
+	SamplingEnabled  bool    `json:"sampling_enabled"`
+	SamplingRate     float64 `json:"sampling_rate"`
 }
 
 // MetricsConfig represents metrics configuration
@@ -143,17 +143,17 @@ func DefaultConfig() *Config {
 			EnableGzip:      true,
 		},
 		YouTube: YouTubeConfig{
-			DefaultLanguages:    []string{"en", "ja", "es", "fr", "de"},
-			RequestTimeout:      30 * time.Second,
-			RetryAttempts:       3,
-			RetryDelay:          time.Second,
-			RetryBackoffFactor:  2.0,
-			RateLimitPerMinute:  60,
-			RateLimitPerHour:    1000,
-			UserAgent:           "YouTube-Transcript-MCP-Server/1.0.0",
-			MaxConcurrent:       10,
-			EnableCookies:       false,
-			EnableYoutubeDL:     false,
+			DefaultLanguages:   []string{"en", "ja", "es", "fr", "de"},
+			RequestTimeout:     30 * time.Second,
+			RetryAttempts:      3,
+			RetryDelay:         time.Second,
+			RetryBackoffFactor: 2.0,
+			RateLimitPerMinute: 60,
+			RateLimitPerHour:   1000,
+			UserAgent:          "YouTube-Transcript-MCP-Server/1.0.0",
+			MaxConcurrent:      10,
+			EnableCookies:      false,
+			EnableYoutubeDL:    false,
 		},
 		MCP: MCPConfig{
 			Version:        "2024-11-05",
@@ -163,11 +163,11 @@ func DefaultConfig() *Config {
 			RequestTimeout: 60 * time.Second,
 			MaxRequestSize: 5 * 1024 * 1024, // 5MB
 			Tools: map[string]bool{
-				"get_transcript":            true,
-				"get_multiple_transcripts":  true,
-				"translate_transcript":      true,
-				"format_transcript":         true,
-				"list_available_languages":  true,
+				"get_transcript":           true,
+				"get_multiple_transcripts": true,
+				"translate_transcript":     true,
+				"format_transcript":        true,
+				"list_available_languages": true,
 			},
 			EnableResources: false,
 			EnablePrompts:   false,
@@ -231,7 +231,7 @@ func Load() (*Config, error) {
 	cfg.Server.MaxRequestSize = getEnvInt64("SERVER_MAX_REQUEST_SIZE", cfg.Server.MaxRequestSize)
 	cfg.Server.EnableCORS = getEnvBool("SERVER_ENABLE_CORS", cfg.Server.EnableCORS)
 	cfg.Server.EnableGzip = getEnvBool("SERVER_ENABLE_GZIP", cfg.Server.EnableGzip)
-	
+
 	if corsOrigins := getEnvString("SERVER_CORS_ORIGINS", ""); corsOrigins != "" {
 		cfg.Server.CORSOrigins = strings.Split(corsOrigins, ",")
 	}

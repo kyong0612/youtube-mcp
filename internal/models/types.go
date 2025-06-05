@@ -14,17 +14,17 @@ type TranscriptSegment struct {
 
 // TranscriptResponse represents the complete transcript response with metadata
 type TranscriptResponse struct {
-	VideoID         string               `json:"video_id"`
-	Title           string               `json:"title,omitempty"`
-	Description     string               `json:"description,omitempty"`
-	Language        string               `json:"language"`
-	TranscriptType  string               `json:"transcript_type"` // "manual", "generated", or "auto"
-	Transcript      []TranscriptSegment  `json:"transcript"`
-	FormattedText   string               `json:"formatted_text,omitempty"`
-	WordCount       int                  `json:"word_count"`
-	CharCount       int                  `json:"char_count"`
-	DurationSeconds float64              `json:"duration_seconds"`
-	Metadata        TranscriptMetadata   `json:"metadata"`
+	VideoID         string              `json:"video_id"`
+	Title           string              `json:"title,omitempty"`
+	Description     string              `json:"description,omitempty"`
+	Language        string              `json:"language"`
+	TranscriptType  string              `json:"transcript_type"` // "manual", "generated", or "auto"
+	Transcript      []TranscriptSegment `json:"transcript"`
+	FormattedText   string              `json:"formatted_text,omitempty"`
+	WordCount       int                 `json:"word_count"`
+	CharCount       int                 `json:"char_count"`
+	DurationSeconds float64             `json:"duration_seconds"`
+	Metadata        TranscriptMetadata  `json:"metadata"`
 }
 
 // TranscriptMetadata contains detailed metadata about the transcript
@@ -43,20 +43,20 @@ type TranscriptMetadata struct {
 
 // MultipleTranscriptResponse represents response for multiple videos
 type MultipleTranscriptResponse struct {
-	Results    []TranscriptResult `json:"results"`
-	Errors     []TranscriptError  `json:"errors,omitempty"`
-	TotalCount int                `json:"total_count"`
-	SuccessCount int              `json:"success_count"`
-	ErrorCount int                `json:"error_count"`
+	Results      []TranscriptResult `json:"results"`
+	Errors       []TranscriptError  `json:"errors,omitempty"`
+	TotalCount   int                `json:"total_count"`
+	SuccessCount int                `json:"success_count"`
+	ErrorCount   int                `json:"error_count"`
 }
 
 // TranscriptResult represents a single video result in batch processing
 type TranscriptResult struct {
-	VideoID    string              `json:"video_id"`
-	Success    bool                `json:"success"`
-	Transcript *TranscriptResponse `json:"transcript,omitempty"`
-	Error      *TranscriptError    `json:"error,omitempty"`
-	ProcessingTime time.Duration     `json:"processing_time,omitempty"`
+	VideoID        string              `json:"video_id"`
+	Success        bool                `json:"success"`
+	Transcript     *TranscriptResponse `json:"transcript,omitempty"`
+	Error          *TranscriptError    `json:"error,omitempty"`
+	ProcessingTime time.Duration       `json:"processing_time,omitempty"`
 }
 
 // TranscriptError represents an error in transcript processing
@@ -121,11 +121,11 @@ func (e *MCPError) Error() string {
 
 // GetTranscriptParams represents parameters for get_transcript tool
 type GetTranscriptParams struct {
-	VideoIdentifier     string   `json:"video_identifier" validate:"required"`
-	Languages           []string `json:"languages,omitempty"`
-	PreserveFormatting  bool     `json:"preserve_formatting,omitempty"`
-	IncludeMetadata     bool     `json:"include_metadata,omitempty"`
-	IncludeTimestamps   bool     `json:"include_timestamps,omitempty"`
+	VideoIdentifier    string   `json:"video_identifier" validate:"required"`
+	Languages          []string `json:"languages,omitempty"`
+	PreserveFormatting bool     `json:"preserve_formatting,omitempty"`
+	IncludeMetadata    bool     `json:"include_metadata,omitempty"`
+	IncludeTimestamps  bool     `json:"include_timestamps,omitempty"`
 }
 
 // GetMultipleTranscriptsParams represents parameters for batch processing
@@ -139,19 +139,19 @@ type GetMultipleTranscriptsParams struct {
 
 // TranslateTranscriptParams represents parameters for translation
 type TranslateTranscriptParams struct {
-	VideoIdentifier string `json:"video_identifier" validate:"required"`
-	TargetLanguage  string `json:"target_language" validate:"required,len=2"`
-	SourceLanguage  string `json:"source_language,omitempty"`
-	PreserveTimestamps bool `json:"preserve_timestamps,omitempty"`
+	VideoIdentifier    string `json:"video_identifier" validate:"required"`
+	TargetLanguage     string `json:"target_language" validate:"required,len=2"`
+	SourceLanguage     string `json:"source_language,omitempty"`
+	PreserveTimestamps bool   `json:"preserve_timestamps,omitempty"`
 }
 
 // FormatTranscriptParams represents parameters for formatting
 type FormatTranscriptParams struct {
-	VideoIdentifier    string `json:"video_identifier" validate:"required"`
-	FormatType         string `json:"format_type,omitempty"` // "plain_text", "paragraphs", "sentences", "srt", "vtt", "json"
-	IncludeTimestamps  bool   `json:"include_timestamps,omitempty"`
-	TimestampFormat    string `json:"timestamp_format,omitempty"` // "seconds", "hms", "ms"
-	MaxLineLength      int    `json:"max_line_length,omitempty"`
+	VideoIdentifier   string `json:"video_identifier" validate:"required"`
+	FormatType        string `json:"format_type,omitempty"` // "plain_text", "paragraphs", "sentences", "srt", "vtt", "json"
+	IncludeTimestamps bool   `json:"include_timestamps,omitempty"`
+	TimestampFormat   string `json:"timestamp_format,omitempty"` // "seconds", "hms", "ms"
+	MaxLineLength     int    `json:"max_line_length,omitempty"`
 }
 
 // ListLanguagesParams represents parameters for listing languages
@@ -174,9 +174,9 @@ type MCPToolsListResponse struct {
 
 // MCPInitializeResponse represents the response to initialize
 type MCPInitializeResponse struct {
-	ProtocolVersion string                 `json:"protocolVersion"`
-	ServerInfo      MCPServerInfo          `json:"serverInfo"`
-	Capabilities    MCPServerCapabilities  `json:"capabilities"`
+	ProtocolVersion string                `json:"protocolVersion"`
+	ServerInfo      MCPServerInfo         `json:"serverInfo"`
+	Capabilities    MCPServerCapabilities `json:"capabilities"`
 }
 
 // MCPServerInfo contains server information
@@ -187,9 +187,9 @@ type MCPServerInfo struct {
 
 // MCPServerCapabilities describes server capabilities
 type MCPServerCapabilities struct {
-	Tools      MCPToolsCapability      `json:"tools,omitempty"`
-	Resources  MCPResourcesCapability  `json:"resources,omitempty"`
-	Prompts    MCPPromptsCapability    `json:"prompts,omitempty"`
+	Tools     MCPToolsCapability     `json:"tools,omitempty"`
+	Resources MCPResourcesCapability `json:"resources,omitempty"`
+	Prompts   MCPPromptsCapability   `json:"prompts,omitempty"`
 }
 
 // MCPToolsCapability describes tools capability
@@ -221,37 +221,37 @@ type MCPToolResult struct {
 
 // MCPContent represents content in MCP format
 type MCPContent struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
+	Type string      `json:"type"`
+	Text string      `json:"text,omitempty"`
 	Data interface{} `json:"data,omitempty"`
 }
 
 // VideoInfo represents basic video information
 type VideoInfo struct {
-	ID              string    `json:"id"`
-	Title           string    `json:"title"`
-	Description     string    `json:"description,omitempty"`
-	Duration        string    `json:"duration,omitempty"`
-	ChannelID       string    `json:"channel_id,omitempty"`
-	ChannelName     string    `json:"channel_name,omitempty"`
-	ThumbnailURL    string    `json:"thumbnail_url,omitempty"`
-	UploadDate      time.Time `json:"upload_date,omitempty"`
-	ViewCount       int64     `json:"view_count,omitempty"`
-	LikeCount       int64     `json:"like_count,omitempty"`
-	DislikeCount    int64     `json:"dislike_count,omitempty"`
-	CommentCount    int64     `json:"comment_count,omitempty"`
-	IsLiveContent   bool      `json:"is_live_content,omitempty"`
-	IsPrivate       bool      `json:"is_private,omitempty"`
-	IsDeleted       bool      `json:"is_deleted,omitempty"`
+	ID            string    `json:"id"`
+	Title         string    `json:"title"`
+	Description   string    `json:"description,omitempty"`
+	Duration      string    `json:"duration,omitempty"`
+	ChannelID     string    `json:"channel_id,omitempty"`
+	ChannelName   string    `json:"channel_name,omitempty"`
+	ThumbnailURL  string    `json:"thumbnail_url,omitempty"`
+	UploadDate    time.Time `json:"upload_date,omitempty"`
+	ViewCount     int64     `json:"view_count,omitempty"`
+	LikeCount     int64     `json:"like_count,omitempty"`
+	DislikeCount  int64     `json:"dislike_count,omitempty"`
+	CommentCount  int64     `json:"comment_count,omitempty"`
+	IsLiveContent bool      `json:"is_live_content,omitempty"`
+	IsPrivate     bool      `json:"is_private,omitempty"`
+	IsDeleted     bool      `json:"is_deleted,omitempty"`
 }
 
 // CacheEntry represents a cached transcript entry
 type CacheEntry struct {
-	Key       string              `json:"key"`
-	Data      interface{}         `json:"data"`
-	Timestamp time.Time           `json:"timestamp"`
-	TTL       time.Duration       `json:"ttl"`
-	HitCount  int                 `json:"hit_count"`
+	Key       string        `json:"key"`
+	Data      interface{}   `json:"data"`
+	Timestamp time.Time     `json:"timestamp"`
+	TTL       time.Duration `json:"ttl"`
+	HitCount  int           `json:"hit_count"`
 }
 
 // ErrorType constants
@@ -273,13 +273,13 @@ const (
 
 // MCP Method constants
 const (
-	MCPMethodListTools      = "tools/list"
-	MCPMethodCallTool       = "tools/call"
-	MCPMethodInitialize     = "initialize"
-	MCPMethodListResources  = "resources/list"
-	MCPMethodReadResource   = "resources/read"
-	MCPMethodListPrompts    = "prompts/list"
-	MCPMethodGetPrompt      = "prompts/get"
+	MCPMethodListTools       = "tools/list"
+	MCPMethodCallTool        = "tools/call"
+	MCPMethodInitialize      = "initialize"
+	MCPMethodListResources   = "resources/list"
+	MCPMethodReadResource    = "resources/read"
+	MCPMethodListPrompts     = "prompts/list"
+	MCPMethodGetPrompt       = "prompts/get"
 	MCPMethodSetLoggingLevel = "logging/setLevel"
 )
 
@@ -312,8 +312,8 @@ const (
 // Timestamp format constants
 const (
 	TimestampFormatSeconds = "seconds"
-	TimestampFormatHMS     = "hms"      // HH:MM:SS
-	TimestampFormatMS      = "ms"       // HH:MM:SS,mmm
+	TimestampFormatHMS     = "hms" // HH:MM:SS
+	TimestampFormatMS      = "ms"  // HH:MM:SS,mmm
 )
 
 // MCP Error codes

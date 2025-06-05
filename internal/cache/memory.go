@@ -10,12 +10,12 @@ import (
 
 // MemoryCache implements an in-memory cache
 type MemoryCache struct {
-	mu       sync.RWMutex
-	items    map[string]*models.CacheEntry
-	maxSize  int
-	maxMemory int64
-	currentMemory int64
-	stopCh   chan struct{}
+	mu              sync.RWMutex
+	items           map[string]*models.CacheEntry
+	maxSize         int
+	maxMemory       int64
+	currentMemory   int64
+	stopCh          chan struct{}
 	cleanupInterval time.Duration
 }
 

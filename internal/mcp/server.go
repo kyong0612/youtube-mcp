@@ -17,13 +17,13 @@ import (
 
 // Server implements the MCP server
 type Server struct {
-	youtube       YouTubeService
-	config        config.MCPConfig
-	validator     *validator.Validate
-	logger        *slog.Logger
-	activeTools   sync.Map
-	requestCount  int64
-	mu            sync.RWMutex
+	youtube      YouTubeService
+	config       config.MCPConfig
+	validator    *validator.Validate
+	logger       *slog.Logger
+	activeTools  sync.Map
+	requestCount int64
+	mu           sync.RWMutex
 }
 
 // NewServer creates a new MCP server instance
@@ -49,7 +49,7 @@ func (s *Server) HandleMCP(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	var request models.MCPRequest
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		s.sendError(w, nil, models.MCPErrorCodeParseError, "Parse error", err.Error())
 		return
@@ -242,7 +242,7 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 // executeGetTranscript executes the get_transcript tool
 func (s *Server) executeGetTranscript(ctx context.Context, arguments map[string]interface{}) (string, error) {
 	var params models.GetTranscriptParams
-	
+
 	if err := s.mapToStruct(arguments, &params); err != nil {
 		return "", &models.MCPError{
 			Code:    models.MCPErrorCodeInvalidParams,
@@ -315,7 +315,7 @@ func (s *Server) executeGetTranscript(ctx context.Context, arguments map[string]
 // executeGetMultipleTranscripts executes the get_multiple_transcripts tool
 func (s *Server) executeGetMultipleTranscripts(ctx context.Context, arguments map[string]interface{}) (string, error) {
 	var params models.GetMultipleTranscriptsParams
-	
+
 	if err := s.mapToStruct(arguments, &params); err != nil {
 		return "", &models.MCPError{
 			Code:    models.MCPErrorCodeInvalidParams,
@@ -371,7 +371,7 @@ func (s *Server) executeGetMultipleTranscripts(ctx context.Context, arguments ma
 // executeTranslateTranscript executes the translate_transcript tool
 func (s *Server) executeTranslateTranscript(ctx context.Context, arguments map[string]interface{}) (string, error) {
 	var params models.TranslateTranscriptParams
-	
+
 	if err := s.mapToStruct(arguments, &params); err != nil {
 		return "", &models.MCPError{
 			Code:    models.MCPErrorCodeInvalidParams,
@@ -434,7 +434,7 @@ func (s *Server) executeTranslateTranscript(ctx context.Context, arguments map[s
 // executeFormatTranscript executes the format_transcript tool
 func (s *Server) executeFormatTranscript(ctx context.Context, arguments map[string]interface{}) (string, error) {
 	var params models.FormatTranscriptParams
-	
+
 	if err := s.mapToStruct(arguments, &params); err != nil {
 		return "", &models.MCPError{
 			Code:    models.MCPErrorCodeInvalidParams,
@@ -479,9 +479,9 @@ func (s *Server) executeFormatTranscript(ctx context.Context, arguments map[stri
 	}
 
 	// For certain format types, return the formatted text directly
-	if params.FormatType == models.FormatTypeSRT || 
-	   params.FormatType == models.FormatTypeVTT || 
-	   params.FormatType == models.FormatTypePlainText {
+	if params.FormatType == models.FormatTypeSRT ||
+		params.FormatType == models.FormatTypeVTT ||
+		params.FormatType == models.FormatTypePlainText {
 		return result.FormattedText, nil
 	}
 
@@ -511,7 +511,7 @@ func (s *Server) executeFormatTranscript(ctx context.Context, arguments map[stri
 // executeListLanguages executes the list_available_languages tool
 func (s *Server) executeListLanguages(ctx context.Context, arguments map[string]interface{}) (string, error) {
 	var params models.ListLanguagesParams
-	
+
 	if err := s.mapToStruct(arguments, &params); err != nil {
 		return "", &models.MCPError{
 			Code:    models.MCPErrorCodeInvalidParams,
