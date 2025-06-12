@@ -103,7 +103,10 @@ func TestHandleMCP_Initialize(t *testing.T) {
 		Method:  models.MCPMethodInitialize,
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -153,7 +156,10 @@ func TestHandleMCP_ListTools(t *testing.T) {
 		Method:  models.MCPMethodListTools,
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -223,7 +229,10 @@ func TestHandleMCP_CallTool_GetTranscript(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -269,7 +278,10 @@ func TestHandleMCP_InvalidMethod(t *testing.T) {
 		Method:  "invalid/method",
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -351,7 +363,10 @@ func TestHandleMCP_DisabledTool(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -390,7 +405,10 @@ func TestGetStats(t *testing.T) {
 		Method:  models.MCPMethodInitialize,
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -399,12 +417,20 @@ func TestGetStats(t *testing.T) {
 	// Get stats
 	stats := server.GetStats()
 
-	if stats["request_count"].(int64) < 1 {
+	requestCount, ok := stats["request_count"].(int64)
+	if !ok {
+		t.Fatalf("Expected request_count to be int64, got %T", stats["request_count"])
+	}
+	if requestCount < 1 {
 		t.Error("Expected request count to be at least 1")
 	}
 
-	if stats["enabled_tools"].(int) != 2 {
-		t.Errorf("Expected 2 enabled tools, got %v", stats["enabled_tools"])
+	enabledTools, ok := stats["enabled_tools"].(int)
+	if !ok {
+		t.Fatalf("Expected enabled_tools to be int, got %T", stats["enabled_tools"])
+	}
+	if enabledTools != 2 {
+		t.Errorf("Expected 2 enabled tools, got %v", enabledTools)
 	}
 
 	if stats["server_version"] != "1.0.0" {
@@ -468,7 +494,10 @@ func TestValidation(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 

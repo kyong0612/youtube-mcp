@@ -12,13 +12,13 @@ import (
 
 // Config represents the complete application configuration
 type Config struct {
-	YouTube  YouTubeConfig  `json:"youtube"`
-	Security SecurityConfig `json:"security"`
 	Metrics  MetricsConfig  `json:"metrics"`
-	Server   ServerConfig   `json:"server"`
-	Cache    CacheConfig    `json:"cache"`
 	MCP      MCPConfig      `json:"mcp"`
+	Security SecurityConfig `json:"security"`
 	Logging  LoggingConfig  `json:"logging"`
+	Server   ServerConfig   `json:"server"`
+	YouTube  YouTubeConfig  `json:"youtube"`
+	Cache    CacheConfig    `json:"cache"`
 }
 
 // ServerConfig represents HTTP server configuration

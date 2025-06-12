@@ -194,14 +194,14 @@ func TestFormatSRTTime(t *testing.T) {
 	s := &Service{}
 
 	tests := []struct {
-		seconds  float64
 		expected string
+		seconds  float64
 	}{
-		{0.0, "00:00:00,000"},
-		{1.5, "00:00:01,500"},
-		{65.123, "00:01:05,123"},
-		{3665.999, "01:01:05,999"},
-		{7200.0, "02:00:00,000"},
+		{"00:00:00,000", 0.0},
+		{"00:00:01,500", 1.5},
+		{"00:01:05,123", 65.123},
+		{"01:01:05,999", 3665.999},
+		{"02:00:00,000", 7200.0},
 	}
 
 	for _, tt := range tests {
@@ -216,14 +216,14 @@ func TestFormatVTTTime(t *testing.T) {
 	s := &Service{}
 
 	tests := []struct {
-		seconds  float64
 		expected string
+		seconds  float64
 	}{
-		{0.0, "00:00:00.000"},
-		{1.5, "00:00:01.500"},
-		{65.123, "00:01:05.123"},
-		{3665.999, "01:01:05.999"},
-		{7200.0, "02:00:00.000"},
+		{"00:00:00.000", 0.0},
+		{"00:00:01.500", 1.5},
+		{"00:01:05.123", 65.123},
+		{"01:01:05.999", 3665.999},
+		{"02:00:00.000", 7200.0},
 	}
 
 	for _, tt := range tests {
@@ -472,7 +472,10 @@ func TestProxyManager(t *testing.T) {
 	}
 
 	// Test wrap around
-	_, _ = pm.GetProxy(req) // third proxy
+	_, err = pm.GetProxy(req) // third proxy
+	if err != nil {
+		t.Fatalf("Failed to get third proxy: %v", err)
+	}
 	proxy4, err := pm.GetProxy(req)
 	if err != nil {
 		t.Fatalf("Failed to get proxy: %v", err)
