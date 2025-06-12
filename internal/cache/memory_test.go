@@ -10,7 +10,11 @@ import (
 
 func TestMemoryCache_SetAndGet(t *testing.T) {
 	cache := NewMemoryCache(100, 100, time.Hour)
-	defer cache.Close()
+	defer func() {
+		if err := cache.Close(); err != nil {
+			t.Errorf("Failed to close cache: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -29,14 +33,22 @@ func TestMemoryCache_SetAndGet(t *testing.T) {
 		t.Fatal("Expected to find value but got not found")
 	}
 
-	if got.(string) != value {
-		t.Errorf("Expected value %s, got %v", value, got)
+	gotStr, ok := got.(string)
+	if !ok {
+		t.Fatalf("Expected string value, got %T", got)
+	}
+	if gotStr != value {
+		t.Errorf("Expected value %s, got %s", value, gotStr)
 	}
 }
 
 func TestMemoryCache_GetNonExistent(t *testing.T) {
 	cache := NewMemoryCache(100, 100, time.Hour)
-	defer cache.Close()
+	defer func() {
+		if err := cache.Close(); err != nil {
+			t.Errorf("Failed to close cache: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -48,7 +60,11 @@ func TestMemoryCache_GetNonExistent(t *testing.T) {
 
 func TestMemoryCache_Expiration(t *testing.T) {
 	cache := NewMemoryCache(100, 100, 50*time.Millisecond)
-	defer cache.Close()
+	defer func() {
+		if err := cache.Close(); err != nil {
+			t.Errorf("Failed to close cache: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -80,7 +96,11 @@ func TestMemoryCache_Expiration(t *testing.T) {
 
 func TestMemoryCache_Delete(t *testing.T) {
 	cache := NewMemoryCache(100, 100, time.Hour)
-	defer cache.Close()
+	defer func() {
+		if err := cache.Close(); err != nil {
+			t.Errorf("Failed to close cache: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -114,7 +134,11 @@ func TestMemoryCache_Delete(t *testing.T) {
 
 func TestMemoryCache_Clear(t *testing.T) {
 	cache := NewMemoryCache(100, 100, time.Hour)
-	defer cache.Close()
+	defer func() {
+		if err := cache.Close(); err != nil {
+			t.Errorf("Failed to close cache: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -147,7 +171,11 @@ func TestMemoryCache_Clear(t *testing.T) {
 func TestMemoryCache_MaxSize(t *testing.T) {
 	maxSize := 3
 	cache := NewMemoryCache(maxSize, 100, time.Hour)
-	defer cache.Close()
+	defer func() {
+		if err := cache.Close(); err != nil {
+			t.Errorf("Failed to close cache: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -180,7 +208,11 @@ func TestMemoryCache_MaxSize(t *testing.T) {
 
 func TestMemoryCache_HitCount(t *testing.T) {
 	cache := NewMemoryCache(100, 100, time.Hour)
-	defer cache.Close()
+	defer func() {
+		if err := cache.Close(); err != nil {
+			t.Errorf("Failed to close cache: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -210,7 +242,11 @@ func TestMemoryCache_HitCount(t *testing.T) {
 
 func TestMemoryCache_ComplexTypes(t *testing.T) {
 	cache := NewMemoryCache(100, 100, time.Hour)
-	defer cache.Close()
+	defer func() {
+		if err := cache.Close(); err != nil {
+			t.Errorf("Failed to close cache: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -257,7 +293,11 @@ func TestMemoryCache_ComplexTypes(t *testing.T) {
 func TestMemoryCache_Cleanup(t *testing.T) {
 	// Short cleanup interval for testing
 	cache := NewMemoryCache(100, 100, 100*time.Millisecond)
-	defer cache.Close()
+	defer func() {
+		if err := cache.Close(); err != nil {
+			t.Errorf("Failed to close cache: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -280,7 +320,11 @@ func TestMemoryCache_Cleanup(t *testing.T) {
 
 func TestMemoryCache_ConcurrentAccess(t *testing.T) {
 	cache := NewMemoryCache(1000, 100, time.Hour)
-	defer cache.Close()
+	defer func() {
+		if err := cache.Close(); err != nil {
+			t.Errorf("Failed to close cache: %v", err)
+		}
+	}()
 
 	ctx := context.Background()
 	done := make(chan bool)
@@ -290,7 +334,9 @@ func TestMemoryCache_ConcurrentAccess(t *testing.T) {
 		go func(id int) {
 			for j := 0; j < 100; j++ {
 				key := string(rune('a'+id)) + string(rune('0'+j%10))
-				cache.Set(ctx, key, id*100+j, time.Hour)
+				if err := cache.Set(ctx, key, id*100+j, time.Hour); err != nil {
+					t.Errorf("Failed to set cache: %v", err)
+				}
 			}
 			done <- true
 		}(i)

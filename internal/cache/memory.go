@@ -10,13 +10,13 @@ import (
 
 // MemoryCache implements an in-memory cache
 type MemoryCache struct {
-	mu              sync.RWMutex
 	items           map[string]*models.CacheEntry
+	stopCh          chan struct{}
 	maxSize         int
 	maxMemory       int64
 	currentMemory   int64
-	stopCh          chan struct{}
 	cleanupInterval time.Duration
+	mu              sync.RWMutex
 }
 
 // NewMemoryCache creates a new memory cache
@@ -36,7 +36,7 @@ func NewMemoryCache(maxSize int, maxMemoryMB int, cleanupInterval time.Duration)
 }
 
 // Get retrieves a value from cache
-func (mc *MemoryCache) Get(ctx context.Context, key string) (interface{}, bool) {
+func (mc *MemoryCache) Get(_ context.Context, key string) (any, bool) {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
@@ -58,7 +58,7 @@ func (mc *MemoryCache) Get(ctx context.Context, key string) (interface{}, bool) 
 }
 
 // Set stores a value in cache with TTL
-func (mc *MemoryCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+func (mc *MemoryCache) Set(_ context.Context, key string, value any, ttl time.Duration) error {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
@@ -81,7 +81,7 @@ func (mc *MemoryCache) Set(ctx context.Context, key string, value interface{}, t
 }
 
 // Delete removes a value from cache
-func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
+func (mc *MemoryCache) Delete(_ context.Context, key string) error {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
@@ -90,7 +90,7 @@ func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
 }
 
 // Clear removes all values from cache
-func (mc *MemoryCache) Clear(ctx context.Context) error {
+func (mc *MemoryCache) Clear(_ context.Context) error {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
@@ -100,7 +100,7 @@ func (mc *MemoryCache) Clear(ctx context.Context) error {
 }
 
 // Size returns the number of items in cache
-func (mc *MemoryCache) Size(ctx context.Context) int {
+func (mc *MemoryCache) Size(_ context.Context) int {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
@@ -159,7 +159,7 @@ func (mc *MemoryCache) evictLRU() {
 }
 
 // Stats returns cache statistics
-func (mc *MemoryCache) Stats() map[string]interface{} {
+func (mc *MemoryCache) Stats() map[string]any {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
@@ -168,7 +168,7 @@ func (mc *MemoryCache) Stats() map[string]interface{} {
 		totalHits += entry.HitCount
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"size":          len(mc.items),
 		"maxSize":       mc.maxSize,
 		"totalHits":     totalHits,

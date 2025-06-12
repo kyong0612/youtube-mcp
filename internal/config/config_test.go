@@ -70,8 +70,14 @@ func TestLoadWithEnvironmentVariables(t *testing.T) {
 
 	// Set environment variables
 	for key, value := range testEnvVars {
-		os.Setenv(key, value)
-		defer os.Unsetenv(key)
+		if err := os.Setenv(key, value); err != nil {
+			t.Fatalf("Failed to set env var %s: %v", key, err)
+		}
+		defer func() {
+			if err := os.Unsetenv(key); err != nil {
+				t.Errorf("Failed to unset env var %s: %v", key, err)
+			}
+		}()
 	}
 
 	cfg, err := Load()
@@ -111,10 +117,10 @@ func TestLoadWithEnvironmentVariables(t *testing.T) {
 
 func TestConfigValidation(t *testing.T) {
 	tests := []struct {
-		name      string
 		setupFunc func(*Config)
-		wantErr   bool
+		name      string
 		errMsg    string
+		wantErr   bool
 	}{
 		{
 			name: "invalid port - too low",
@@ -220,8 +226,14 @@ func TestConfigValidation(t *testing.T) {
 
 func TestGetEnvHelpers(t *testing.T) {
 	// Test getEnvString
-	os.Setenv("TEST_STRING", "hello")
-	defer os.Unsetenv("TEST_STRING")
+	if err := os.Setenv("TEST_STRING", "hello"); err != nil {
+		t.Fatalf("Failed to set TEST_STRING: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("TEST_STRING"); err != nil {
+			t.Errorf("Failed to unset TEST_STRING: %v", err)
+		}
+	}()
 	if v := getEnvString("TEST_STRING", "default"); v != "hello" {
 		t.Errorf("Expected 'hello', got '%s'", v)
 	}
@@ -230,8 +242,14 @@ func TestGetEnvHelpers(t *testing.T) {
 	}
 
 	// Test getEnvInt
-	os.Setenv("TEST_INT", "42")
-	defer os.Unsetenv("TEST_INT")
+	if err := os.Setenv("TEST_INT", "42"); err != nil {
+		t.Fatalf("Failed to set TEST_INT: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("TEST_INT"); err != nil {
+			t.Errorf("Failed to unset TEST_INT: %v", err)
+		}
+	}()
 	if v := getEnvInt("TEST_INT", 10); v != 42 {
 		t.Errorf("Expected 42, got %d", v)
 	}
@@ -240,8 +258,14 @@ func TestGetEnvHelpers(t *testing.T) {
 	}
 
 	// Test getEnvBool
-	os.Setenv("TEST_BOOL", "true")
-	defer os.Unsetenv("TEST_BOOL")
+	if err := os.Setenv("TEST_BOOL", "true"); err != nil {
+		t.Fatalf("Failed to set TEST_BOOL: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("TEST_BOOL"); err != nil {
+			t.Errorf("Failed to unset TEST_BOOL: %v", err)
+		}
+	}()
 	if v := getEnvBool("TEST_BOOL", false); !v {
 		t.Error("Expected true, got false")
 	}
@@ -250,8 +274,14 @@ func TestGetEnvHelpers(t *testing.T) {
 	}
 
 	// Test getEnvDuration
-	os.Setenv("TEST_DURATION", "5m")
-	defer os.Unsetenv("TEST_DURATION")
+	if err := os.Setenv("TEST_DURATION", "5m"); err != nil {
+		t.Fatalf("Failed to set TEST_DURATION: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("TEST_DURATION"); err != nil {
+			t.Errorf("Failed to unset TEST_DURATION: %v", err)
+		}
+	}()
 	if v := getEnvDuration("TEST_DURATION", time.Second); v != 5*time.Minute {
 		t.Errorf("Expected 5m, got %v", v)
 	}
@@ -260,8 +290,14 @@ func TestGetEnvHelpers(t *testing.T) {
 	}
 
 	// Test getEnvFloat
-	os.Setenv("TEST_FLOAT", "3.14")
-	defer os.Unsetenv("TEST_FLOAT")
+	if err := os.Setenv("TEST_FLOAT", "3.14"); err != nil {
+		t.Fatalf("Failed to set TEST_FLOAT: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("TEST_FLOAT"); err != nil {
+			t.Errorf("Failed to unset TEST_FLOAT: %v", err)
+		}
+	}()
 	if v := getEnvFloat("TEST_FLOAT", 2.0); v != 3.14 {
 		t.Errorf("Expected 3.14, got %f", v)
 	}
@@ -270,8 +306,14 @@ func TestGetEnvHelpers(t *testing.T) {
 	}
 
 	// Test getEnvInt64
-	os.Setenv("TEST_INT64", "9223372036854775807")
-	defer os.Unsetenv("TEST_INT64")
+	if err := os.Setenv("TEST_INT64", "9223372036854775807"); err != nil {
+		t.Fatalf("Failed to set TEST_INT64: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("TEST_INT64"); err != nil {
+			t.Errorf("Failed to unset TEST_INT64: %v", err)
+		}
+	}()
 	if v := getEnvInt64("TEST_INT64", 100); v != 9223372036854775807 {
 		t.Errorf("Expected max int64, got %d", v)
 	}

@@ -103,7 +103,10 @@ func TestHandleMCP_Initialize(t *testing.T) {
 		Method:  models.MCPMethodInitialize,
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -122,7 +125,7 @@ func TestHandleMCP_Initialize(t *testing.T) {
 		t.Errorf("Unexpected error: %v", response.Error)
 	}
 
-	result, ok := response.Result.(map[string]interface{})
+	result, ok := response.Result.(map[string]any)
 	if !ok {
 		t.Fatal("Expected result to be a map")
 	}
@@ -153,7 +156,10 @@ func TestHandleMCP_ListTools(t *testing.T) {
 		Method:  models.MCPMethodListTools,
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -168,12 +174,12 @@ func TestHandleMCP_ListTools(t *testing.T) {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
 
-	result, ok := response.Result.(map[string]interface{})
+	result, ok := response.Result.(map[string]any)
 	if !ok {
 		t.Fatal("Expected result to be a map")
 	}
 
-	tools, ok := result["tools"].([]interface{})
+	tools, ok := result["tools"].([]any)
 	if !ok {
 		t.Fatal("Expected tools to be an array")
 	}
@@ -214,16 +220,19 @@ func TestHandleMCP_CallTool_GetTranscript(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      1,
 		Method:  models.MCPMethodCallTool,
-		Params: map[string]interface{}{
+		Params: map[string]any{
 			"name": "get_transcript",
-			"arguments": map[string]interface{}{
+			"arguments": map[string]any{
 				"video_identifier": "test123",
 				"languages":        []string{"en"},
 			},
 		},
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -242,12 +251,12 @@ func TestHandleMCP_CallTool_GetTranscript(t *testing.T) {
 		t.Errorf("Unexpected error: %v", response.Error)
 	}
 
-	result, ok := response.Result.(map[string]interface{})
+	result, ok := response.Result.(map[string]any)
 	if !ok {
 		t.Fatal("Expected result to be a map")
 	}
 
-	content, ok := result["content"].([]interface{})
+	content, ok := result["content"].([]any)
 	if !ok || len(content) == 0 {
 		t.Fatal("Expected content array")
 	}
@@ -269,7 +278,10 @@ func TestHandleMCP_InvalidMethod(t *testing.T) {
 		Method:  "invalid/method",
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -343,15 +355,18 @@ func TestHandleMCP_DisabledTool(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      1,
 		Method:  models.MCPMethodCallTool,
-		Params: map[string]interface{}{
+		Params: map[string]any{
 			"name": "get_transcript",
-			"arguments": map[string]interface{}{
+			"arguments": map[string]any{
 				"video_identifier": "test123",
 			},
 		},
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -390,7 +405,10 @@ func TestGetStats(t *testing.T) {
 		Method:  models.MCPMethodInitialize,
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
@@ -399,12 +417,20 @@ func TestGetStats(t *testing.T) {
 	// Get stats
 	stats := server.GetStats()
 
-	if stats["request_count"].(int64) < 1 {
+	requestCount, ok := stats["request_count"].(int64)
+	if !ok {
+		t.Fatalf("Expected request_count to be int64, got %T", stats["request_count"])
+	}
+	if requestCount < 1 {
 		t.Error("Expected request count to be at least 1")
 	}
 
-	if stats["enabled_tools"].(int) != 2 {
-		t.Errorf("Expected 2 enabled tools, got %v", stats["enabled_tools"])
+	enabledTools, ok := stats["enabled_tools"].(int)
+	if !ok {
+		t.Fatalf("Expected enabled_tools to be int, got %T", stats["enabled_tools"])
+	}
+	if enabledTools != 2 {
+		t.Errorf("Expected 2 enabled tools, got %v", enabledTools)
 	}
 
 	if stats["server_version"] != "1.0.0" {
@@ -415,9 +441,9 @@ func TestGetStats(t *testing.T) {
 func TestMapToStruct(t *testing.T) {
 	server := &Server{}
 
-	input := map[string]interface{}{
+	input := map[string]any{
 		"video_identifier":    "test123",
-		"languages":           []interface{}{"en", "ja"},
+		"languages":           []any{"en", "ja"},
 		"preserve_formatting": true,
 	}
 
@@ -459,16 +485,19 @@ func TestValidation(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      1,
 		Method:  models.MCPMethodCallTool,
-		Params: map[string]interface{}{
+		Params: map[string]any{
 			"name": "get_transcript",
-			"arguments": map[string]interface{}{
+			"arguments": map[string]any{
 				// Missing video_identifier
 				"languages": []string{"en"},
 			},
 		},
 	}
 
-	body, _ := json.Marshal(request)
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 

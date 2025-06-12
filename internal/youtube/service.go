@@ -16,31 +16,32 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/youtube-transcript-mcp/internal/cache"
 	"github.com/youtube-transcript-mcp/internal/config"
 	"github.com/youtube-transcript-mcp/internal/models"
-	"golang.org/x/time/rate"
 )
 
 // Service handles YouTube transcript operations
 type Service struct {
-	config         config.YouTubeConfig
-	httpClient     *http.Client
 	cache          cache.Cache
+	httpClient     *http.Client
 	rateLimiter    *rate.Limiter
 	hourlyLimiter  *rate.Limiter
 	proxyManager   *ProxyManager
 	logger         *slog.Logger
 	rateLimitState *RateLimitState
+	config         config.YouTubeConfig
 }
 
 // RateLimitState tracks rate limiting state for adaptive behavior
 type RateLimitState struct {
-	mu                  sync.RWMutex
-	consecutiveFailures int
 	lastFailureTime     time.Time
 	backoffUntil        time.Time
+	consecutiveFailures int
 	adaptiveMultiplier  float64
+	mu                  sync.RWMutex
 }
 
 // ProxyManager manages proxy rotation
@@ -72,9 +73,13 @@ func NewService(cfg config.YouTubeConfig, cache cache.Cache, logger *slog.Logger
 			Proxy: proxyManager.GetProxy,
 		}
 	} else if cfg.ProxyURL != "" {
-		proxyURL, _ := url.Parse(cfg.ProxyURL)
-		httpClient.Transport = &http.Transport{
-			Proxy: http.ProxyURL(proxyURL),
+		proxyURL, err := url.Parse(cfg.ProxyURL)
+		if err != nil {
+			logger.Error("Failed to parse proxy URL", "error", err, "proxy", cfg.ProxyURL)
+		} else {
+			httpClient.Transport = &http.Transport{
+				Proxy: http.ProxyURL(proxyURL),
+			}
 		}
 	}
 
@@ -132,10 +137,10 @@ func (s *Service) GetTranscript(ctx context.Context, videoIdentifier string, lan
 	}
 
 	// Wait for rate limiters with adaptive backoff
-	if err := s.waitForRateLimit(ctx); err != nil {
+	if waitErr := s.waitForRateLimit(ctx); waitErr != nil {
 		return nil, &models.TranscriptError{
 			Type:    models.ErrorTypeRateLimitExceeded,
-			Message: fmt.Sprintf("Rate limit exceeded: %s", err.Error()),
+			Message: fmt.Sprintf("Rate limit exceeded: %s", waitErr.Error()),
 			VideoID: videoID,
 		}
 	}
@@ -441,7 +446,11 @@ func (s *Service) fetchVideoData(ctx context.Context, videoID string) (*VideoDat
 			VideoID: videoID,
 		}
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			slog.Warn("Failed to close response body", "error", closeErr)
+		}
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, &models.TranscriptError{
@@ -492,7 +501,11 @@ func (s *Service) parseVideoData(html string, videoID string) (*VideoData, error
 		videoData.Description = details.ShortDescription
 		videoData.ChannelID = details.ChannelID
 		videoData.ChannelName = details.Author
-		videoData.ViewCount, _ = strconv.ParseInt(details.ViewCount, 10, 64)
+		if viewCount, err := strconv.ParseInt(details.ViewCount, 10, 64); err == nil {
+			videoData.ViewCount = viewCount
+		} else {
+			slog.Warn("Failed to parse view count", "error", err, "viewCount", details.ViewCount)
+		}
 		videoData.IsLive = details.IsLiveContent
 	}
 
@@ -511,7 +524,12 @@ func (s *Service) parseVideoData(html string, videoID string) (*VideoData, error
 // extractVideoID extracts video ID from various YouTube URL formats
 func (s *Service) extractVideoID(identifier string) (string, error) {
 	// If it's already a video ID (11 characters, alphanumeric + underscore + dash)
-	if matched, _ := regexp.MatchString(`^[a-zA-Z0-9_-]{11}$`, identifier); matched {
+	matched, err := regexp.MatchString(`^[a-zA-Z0-9_-]{11}$`, identifier)
+	if err != nil {
+		slog.Warn("Failed to match regex", "error", err)
+		return identifier, nil // Assume it's already a video ID
+	}
+	if matched {
 		return identifier, nil
 	}
 
@@ -593,7 +611,11 @@ func (s *Service) fetchTranscriptFromTrack(ctx context.Context, track *CaptionTr
 			Message: fmt.Sprintf("Failed to fetch transcript: %s", err.Error()),
 		}
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			slog.Warn("Failed to close response body", "error", closeErr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, &models.TranscriptError{
@@ -624,9 +646,9 @@ func (s *Service) fetchTranscriptFromTrack(ctx context.Context, track *CaptionTr
 
 // Text represents a text element in XML transcripts
 type Text struct {
+	Text  string  `xml:",chardata"`
 	Start float64 `xml:"start,attr"`
 	Dur   float64 `xml:"dur,attr"`
-	Text  string  `xml:",chardata"`
 }
 
 // parseTranscriptXML parses YouTube's transcript XML format with improved error handling
@@ -658,18 +680,18 @@ func (s *Service) parseTranscriptXML(data []byte) ([]models.TranscriptSegment, e
 		XMLName xml.Name `xml:"timedtext"`
 		Head    struct {
 			Ws struct {
-				WinStyles []interface{} `xml:"ws"`
+				WinStyles []any `xml:"ws"`
 			} `xml:"ws"`
 			Wp struct {
-				PenStyles []interface{} `xml:"wp"`
+				PenStyles []any `xml:"wp"`
 			} `xml:"wp"`
 		} `xml:"head"`
 		Body struct {
 			Paragraphs []struct {
+				Text      string  `xml:",chardata"`
+				Sentences []Text  `xml:"s"`
 				Start     float64 `xml:"t,attr"`
 				Dur       float64 `xml:"d,attr"`
-				Sentences []Text  `xml:"s"`
-				Text      string  `xml:",chardata"`
 			} `xml:"p"`
 			Texts []Text `xml:"text"`
 		} `xml:"body"`
@@ -1178,7 +1200,9 @@ func (s *Service) doHTTPRequestWithRetry(ctx context.Context, req *http.Request)
 
 		// Check for retryable HTTP status codes
 		if resp.StatusCode >= 500 || resp.StatusCode == 429 {
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				slog.Warn("Failed to close response body", "error", err)
+			}
 			return fmt.Errorf("HTTP error: %d", resp.StatusCode)
 		}
 
@@ -1217,11 +1241,11 @@ type VideoData struct {
 	ChannelID     string
 	ChannelName   string
 	PublishedAt   string
+	CaptionTracks []CaptionTrack
 	ViewCount     int64
 	LikeCount     int64
 	CommentCount  int64
 	IsLive        bool
-	CaptionTracks []CaptionTrack
 }
 
 type PlayerResponse struct {

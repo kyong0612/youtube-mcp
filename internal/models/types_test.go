@@ -78,7 +78,7 @@ func TestMCPError_Error(t *testing.T) {
 			err: &MCPError{
 				Code:    MCPErrorCodeInternalError,
 				Message: "Internal server error",
-				Data:    map[string]interface{}{"details": "database connection failed"},
+				Data:    map[string]any{"details": "database connection failed"},
 			},
 			want: "Internal server error",
 		},
@@ -184,6 +184,15 @@ func TestCacheEntry(t *testing.T) {
 
 	if entry.Key != "test:key" {
 		t.Errorf("Expected key 'test:key', got %s", entry.Key)
+	}
+	if entry.Data != "test data" {
+		t.Errorf("Expected data 'test data', got %v", entry.Data)
+	}
+	if !entry.Timestamp.Equal(now) {
+		t.Errorf("Expected timestamp %v, got %v", now, entry.Timestamp)
+	}
+	if entry.TTL != time.Hour {
+		t.Errorf("Expected TTL 1 hour, got %v", entry.TTL)
 	}
 	if entry.HitCount != 5 {
 		t.Errorf("Expected hit count 5, got %d", entry.HitCount)

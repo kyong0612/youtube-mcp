@@ -94,3 +94,6 @@ site/
 # Kubernetes
 kubeconfig
 *.kubeconfig
+
+# Development tools
+.tools/

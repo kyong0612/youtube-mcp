@@ -1,3 +1,4 @@
+// Package models defines data structures used throughout the application.
 package models
 
 import (
@@ -18,24 +19,24 @@ type TranscriptResponse struct {
 	Title           string              `json:"title,omitempty"`
 	Description     string              `json:"description,omitempty"`
 	Language        string              `json:"language"`
-	TranscriptType  string              `json:"transcript_type"` // "manual", "generated", or "auto"
-	Transcript      []TranscriptSegment `json:"transcript"`
+	TranscriptType  string              `json:"transcript_type"`
 	FormattedText   string              `json:"formatted_text,omitempty"`
+	Transcript      []TranscriptSegment `json:"transcript"`
+	Metadata        TranscriptMetadata  `json:"metadata"`
 	WordCount       int                 `json:"word_count"`
 	CharCount       int                 `json:"char_count"`
 	DurationSeconds float64             `json:"duration_seconds"`
-	Metadata        TranscriptMetadata  `json:"metadata"`
 }
 
 // TranscriptMetadata contains detailed metadata about the transcript
 type TranscriptMetadata struct {
 	ExtractionTimestamp time.Time `json:"extraction_timestamp"`
 	LanguageDetected    string    `json:"language_detected,omitempty"`
-	Confidence          float64   `json:"confidence,omitempty"`
 	Source              string    `json:"source"`
 	ChannelID           string    `json:"channel_id,omitempty"`
 	ChannelName         string    `json:"channel_name,omitempty"`
 	PublishedAt         string    `json:"published_at,omitempty"`
+	Confidence          float64   `json:"confidence,omitempty"`
 	ViewCount           int64     `json:"view_count,omitempty"`
 	LikeCount           int64     `json:"like_count,omitempty"`
 	CommentCount        int64     `json:"comment_count,omitempty"`
@@ -52,11 +53,11 @@ type MultipleTranscriptResponse struct {
 
 // TranscriptResult represents a single video result in batch processing
 type TranscriptResult struct {
-	VideoID        string              `json:"video_id"`
-	Success        bool                `json:"success"`
 	Transcript     *TranscriptResponse `json:"transcript,omitempty"`
 	Error          *TranscriptError    `json:"error,omitempty"`
+	VideoID        string              `json:"video_id"`
 	ProcessingTime time.Duration       `json:"processing_time,omitempty"`
+	Success        bool                `json:"success"`
 }
 
 // TranscriptError represents an error in transcript processing
@@ -86,32 +87,32 @@ type LanguageInfo struct {
 // AvailableLanguagesResponse represents response for available languages
 type AvailableLanguagesResponse struct {
 	VideoID           string         `json:"video_id"`
-	Languages         []LanguageInfo `json:"languages"`
 	DefaultLanguage   string         `json:"default_language"`
+	Languages         []LanguageInfo `json:"languages"`
 	TranslatableCount int            `json:"translatable_count"`
 }
 
 // MCPRequest represents a Model Context Protocol request
 type MCPRequest struct {
-	JSONRPC string      `json:"jsonrpc"`
-	ID      interface{} `json:"id"`
-	Method  string      `json:"method"`
-	Params  interface{} `json:"params,omitempty"`
+	ID      any    `json:"id"`
+	Params  any    `json:"params,omitempty"`
+	JSONRPC string `json:"jsonrpc"`
+	Method  string `json:"method"`
 }
 
 // MCPResponse represents a Model Context Protocol response
 type MCPResponse struct {
-	JSONRPC string      `json:"jsonrpc"`
-	ID      interface{} `json:"id"`
-	Result  interface{} `json:"result,omitempty"`
-	Error   *MCPError   `json:"error,omitempty"`
+	ID      any       `json:"id"`
+	Result  any       `json:"result,omitempty"`
+	Error   *MCPError `json:"error,omitempty"`
+	JSONRPC string    `json:"jsonrpc"`
 }
 
 // MCPError represents an MCP error
 type MCPError struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
+	Data    any    `json:"data,omitempty"`
+	Message string `json:"message"`
+	Code    int    `json:"code"`
 }
 
 // Error implements the error interface
@@ -148,10 +149,10 @@ type TranslateTranscriptParams struct {
 // FormatTranscriptParams represents parameters for formatting
 type FormatTranscriptParams struct {
 	VideoIdentifier   string `json:"video_identifier" validate:"required"`
-	FormatType        string `json:"format_type,omitempty"` // "plain_text", "paragraphs", "sentences", "srt", "vtt", "json"
-	IncludeTimestamps bool   `json:"include_timestamps,omitempty"`
-	TimestampFormat   string `json:"timestamp_format,omitempty"` // "seconds", "hms", "ms"
+	FormatType        string `json:"format_type,omitempty"`
+	TimestampFormat   string `json:"timestamp_format,omitempty"`
 	MaxLineLength     int    `json:"max_line_length,omitempty"`
+	IncludeTimestamps bool   `json:"include_timestamps,omitempty"`
 }
 
 // ListLanguagesParams represents parameters for listing languages
@@ -162,9 +163,9 @@ type ListLanguagesParams struct {
 
 // MCPTool represents an MCP tool definition
 type MCPTool struct {
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	InputSchema interface{} `json:"inputSchema"`
+	InputSchema any    `json:"inputSchema"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // MCPToolsListResponse represents the response to list_tools
@@ -210,8 +211,8 @@ type MCPPromptsCapability struct {
 
 // MCPToolCallParams represents parameters for tool call
 type MCPToolCallParams struct {
-	Name      string                 `json:"name"`
-	Arguments map[string]interface{} `json:"arguments"`
+	Arguments map[string]any `json:"arguments"`
+	Name      string         `json:"name"`
 }
 
 // MCPToolResult represents the result of a tool call
@@ -221,21 +222,21 @@ type MCPToolResult struct {
 
 // MCPContent represents content in MCP format
 type MCPContent struct {
-	Type string      `json:"type"`
-	Text string      `json:"text,omitempty"`
-	Data interface{} `json:"data,omitempty"`
+	Data any    `json:"data,omitempty"`
+	Type string `json:"type"`
+	Text string `json:"text,omitempty"`
 }
 
 // VideoInfo represents basic video information
 type VideoInfo struct {
-	ID            string    `json:"id"`
-	Title         string    `json:"title"`
+	UploadDate    time.Time `json:"upload_date,omitempty"`
+	ThumbnailURL  string    `json:"thumbnail_url,omitempty"`
 	Description   string    `json:"description,omitempty"`
 	Duration      string    `json:"duration,omitempty"`
 	ChannelID     string    `json:"channel_id,omitempty"`
 	ChannelName   string    `json:"channel_name,omitempty"`
-	ThumbnailURL  string    `json:"thumbnail_url,omitempty"`
-	UploadDate    time.Time `json:"upload_date,omitempty"`
+	ID            string    `json:"id"`
+	Title         string    `json:"title"`
 	ViewCount     int64     `json:"view_count,omitempty"`
 	LikeCount     int64     `json:"like_count,omitempty"`
 	DislikeCount  int64     `json:"dislike_count,omitempty"`
@@ -247,9 +248,9 @@ type VideoInfo struct {
 
 // CacheEntry represents a cached transcript entry
 type CacheEntry struct {
-	Key       string        `json:"key"`
-	Data      interface{}   `json:"data"`
 	Timestamp time.Time     `json:"timestamp"`
+	Data      any           `json:"data"`
+	Key       string        `json:"key"`
 	TTL       time.Duration `json:"ttl"`
 	HitCount  int           `json:"hit_count"`
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+
 	"github.com/youtube-transcript-mcp/internal/config"
 	"github.com/youtube-transcript-mcp/internal/models"
 )
@@ -18,10 +19,10 @@ import (
 // Server implements the MCP server
 type Server struct {
 	youtube      YouTubeService
-	config       config.MCPConfig
 	validator    *validator.Validate
 	logger       *slog.Logger
 	activeTools  sync.Map
+	config       config.MCPConfig
 	requestCount int64
 	mu           sync.RWMutex
 }
@@ -65,7 +66,6 @@ func (s *Server) HandleMCP(w http.ResponseWriter, r *http.Request) {
 	s.incrementRequestCount()
 
 	var response *models.MCPResponse
-	var err error
 
 	switch request.Method {
 	case models.MCPMethodInitialize:
@@ -86,15 +86,6 @@ func (s *Server) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		response = s.handleSetLoggingLevel(ctx, request)
 	default:
 		s.sendError(w, request.ID, models.MCPErrorCodeMethodNotFound, "Method not found", request.Method)
-		return
-	}
-
-	if err != nil {
-		s.logger.Error("Error handling MCP request",
-			slog.String("method", request.Method),
-			slog.Any("error", err),
-		)
-		s.sendError(w, request.ID, models.MCPErrorCodeInternalError, "Internal error", err.Error())
 		return
 	}
 
@@ -158,15 +149,18 @@ func (s *Server) handleListTools(ctx context.Context, request models.MCPRequest)
 
 // handleCallTool handles the tools/call method
 func (s *Server) handleCallTool(ctx context.Context, request models.MCPRequest) *models.MCPResponse {
-	params, ok := request.Params.(map[string]interface{})
+	params, ok := request.Params.(map[string]any)
 	if !ok {
 		return s.errorResponse(request.ID, models.MCPErrorCodeInvalidParams, "Invalid parameters")
 	}
 
 	// Extract tool call parameters
 	var toolCall models.MCPToolCallParams
-	paramsBytes, _ := json.Marshal(params)
-	if err := json.Unmarshal(paramsBytes, &toolCall); err != nil {
+	paramsBytes, err := json.Marshal(params)
+	if err != nil {
+		return s.errorResponse(request.ID, models.MCPErrorCodeInvalidParams, fmt.Sprintf("Failed to marshal params: %v", err))
+	}
+	if unmarshalErr := json.Unmarshal(paramsBytes, &toolCall); unmarshalErr != nil {
 		return s.errorResponse(request.ID, models.MCPErrorCodeInvalidParams, "Invalid tool call parameters")
 	}
 
@@ -214,7 +208,7 @@ func (s *Server) handleCallTool(ctx context.Context, request models.MCPRequest) 
 }
 
 // executeTool executes the specified tool with given arguments
-func (s *Server) executeTool(ctx context.Context, toolName string, arguments map[string]interface{}) (string, error) {
+func (s *Server) executeTool(ctx context.Context, toolName string, arguments map[string]any) (string, error) {
 	s.logger.Info("Executing tool",
 		slog.String("tool", toolName),
 		slog.Any("arguments", arguments),
@@ -240,7 +234,7 @@ func (s *Server) executeTool(ctx context.Context, toolName string, arguments map
 }
 
 // executeGetTranscript executes the get_transcript tool
-func (s *Server) executeGetTranscript(ctx context.Context, arguments map[string]interface{}) (string, error) {
+func (s *Server) executeGetTranscript(ctx context.Context, arguments map[string]any) (string, error) {
 	var params models.GetTranscriptParams
 
 	if err := s.mapToStruct(arguments, &params); err != nil {
@@ -270,7 +264,7 @@ func (s *Server) executeGetTranscript(ctx context.Context, arguments map[string]
 			return "", &models.MCPError{
 				Code:    models.MCPErrorCodeServerError,
 				Message: mcpErr.Message,
-				Data: map[string]interface{}{
+				Data: map[string]any{
 					"type":        mcpErr.Type,
 					"video_id":    mcpErr.VideoID,
 					"suggestions": mcpErr.Suggestions,
@@ -313,7 +307,7 @@ func (s *Server) executeGetTranscript(ctx context.Context, arguments map[string]
 }
 
 // executeGetMultipleTranscripts executes the get_multiple_transcripts tool
-func (s *Server) executeGetMultipleTranscripts(ctx context.Context, arguments map[string]interface{}) (string, error) {
+func (s *Server) executeGetMultipleTranscripts(ctx context.Context, arguments map[string]any) (string, error) {
 	var params models.GetMultipleTranscriptsParams
 
 	if err := s.mapToStruct(arguments, &params); err != nil {
@@ -369,7 +363,7 @@ func (s *Server) executeGetMultipleTranscripts(ctx context.Context, arguments ma
 }
 
 // executeTranslateTranscript executes the translate_transcript tool
-func (s *Server) executeTranslateTranscript(ctx context.Context, arguments map[string]interface{}) (string, error) {
+func (s *Server) executeTranslateTranscript(ctx context.Context, arguments map[string]any) (string, error) {
 	var params models.TranslateTranscriptParams
 
 	if err := s.mapToStruct(arguments, &params); err != nil {
@@ -398,7 +392,7 @@ func (s *Server) executeTranslateTranscript(ctx context.Context, arguments map[s
 			return "", &models.MCPError{
 				Code:    models.MCPErrorCodeServerError,
 				Message: transcriptErr.Message,
-				Data: map[string]interface{}{
+				Data: map[string]any{
 					"type":     transcriptErr.Type,
 					"video_id": transcriptErr.VideoID,
 				},
@@ -432,7 +426,7 @@ func (s *Server) executeTranslateTranscript(ctx context.Context, arguments map[s
 }
 
 // executeFormatTranscript executes the format_transcript tool
-func (s *Server) executeFormatTranscript(ctx context.Context, arguments map[string]interface{}) (string, error) {
+func (s *Server) executeFormatTranscript(ctx context.Context, arguments map[string]any) (string, error) {
 	var params models.FormatTranscriptParams
 
 	if err := s.mapToStruct(arguments, &params); err != nil {
@@ -466,7 +460,7 @@ func (s *Server) executeFormatTranscript(ctx context.Context, arguments map[stri
 			return "", &models.MCPError{
 				Code:    models.MCPErrorCodeServerError,
 				Message: transcriptErr.Message,
-				Data: map[string]interface{}{
+				Data: map[string]any{
 					"type":     transcriptErr.Type,
 					"video_id": transcriptErr.VideoID,
 				},
@@ -486,7 +480,7 @@ func (s *Server) executeFormatTranscript(ctx context.Context, arguments map[stri
 	}
 
 	// For other formats, return structured response
-	response := map[string]interface{}{
+	response := map[string]any{
 		"video_id":       result.VideoID,
 		"title":          result.Title,
 		"language":       result.Language,
@@ -509,7 +503,7 @@ func (s *Server) executeFormatTranscript(ctx context.Context, arguments map[stri
 }
 
 // executeListLanguages executes the list_available_languages tool
-func (s *Server) executeListLanguages(ctx context.Context, arguments map[string]interface{}) (string, error) {
+func (s *Server) executeListLanguages(ctx context.Context, arguments map[string]any) (string, error) {
 	var params models.ListLanguagesParams
 
 	if err := s.mapToStruct(arguments, &params); err != nil {
@@ -533,7 +527,7 @@ func (s *Server) executeListLanguages(ctx context.Context, arguments map[string]
 			return "", &models.MCPError{
 				Code:    models.MCPErrorCodeServerError,
 				Message: transcriptErr.Message,
-				Data: map[string]interface{}{
+				Data: map[string]any{
 					"type":     transcriptErr.Type,
 					"video_id": transcriptErr.VideoID,
 				},
@@ -576,31 +570,31 @@ func (s *Server) getAvailableTools() []models.MCPTool {
 		tools = append(tools, models.MCPTool{
 			Name:        models.ToolGetTranscript,
 			Description: "Get transcript for a YouTube video in specified languages",
-			InputSchema: map[string]interface{}{
+			InputSchema: map[string]any{
 				"type": "object",
-				"properties": map[string]interface{}{
-					"video_identifier": map[string]interface{}{
+				"properties": map[string]any{
+					"video_identifier": map[string]any{
 						"type":        "string",
 						"description": "YouTube video URL, video ID, or watch URL",
 					},
-					"languages": map[string]interface{}{
+					"languages": map[string]any{
 						"type": "array",
-						"items": map[string]interface{}{
+						"items": map[string]any{
 							"type": "string",
 						},
 						"description": "Preferred language codes (e.g., ['en', 'ja']). If not specified, uses default languages.",
 					},
-					"preserve_formatting": map[string]interface{}{
+					"preserve_formatting": map[string]any{
 						"type":        "boolean",
 						"description": "Whether to preserve original formatting with timestamps",
 						"default":     false,
 					},
-					"include_metadata": map[string]interface{}{
+					"include_metadata": map[string]any{
 						"type":        "boolean",
 						"description": "Whether to include video metadata (channel, views, etc.)",
 						"default":     true,
 					},
-					"include_timestamps": map[string]interface{}{
+					"include_timestamps": map[string]any{
 						"type":        "boolean",
 						"description": "Whether to include timestamp information in segments",
 						"default":     true,
@@ -615,36 +609,36 @@ func (s *Server) getAvailableTools() []models.MCPTool {
 		tools = append(tools, models.MCPTool{
 			Name:        models.ToolGetMultipleTranscripts,
 			Description: "Get transcripts for multiple YouTube videos",
-			InputSchema: map[string]interface{}{
+			InputSchema: map[string]any{
 				"type": "object",
-				"properties": map[string]interface{}{
-					"video_identifiers": map[string]interface{}{
+				"properties": map[string]any{
+					"video_identifiers": map[string]any{
 						"type": "array",
-						"items": map[string]interface{}{
+						"items": map[string]any{
 							"type": "string",
 						},
 						"description": "List of YouTube video URLs or IDs (max 50)",
 						"minItems":    1,
 						"maxItems":    50,
 					},
-					"languages": map[string]interface{}{
+					"languages": map[string]any{
 						"type": "array",
-						"items": map[string]interface{}{
+						"items": map[string]any{
 							"type": "string",
 						},
 						"description": "Preferred language codes",
 					},
-					"continue_on_error": map[string]interface{}{
+					"continue_on_error": map[string]any{
 						"type":        "boolean",
 						"description": "Continue processing other videos if one fails",
 						"default":     true,
 					},
-					"include_metadata": map[string]interface{}{
+					"include_metadata": map[string]any{
 						"type":        "boolean",
 						"description": "Whether to include video metadata",
 						"default":     false,
 					},
-					"parallel": map[string]interface{}{
+					"parallel": map[string]any{
 						"type":        "boolean",
 						"description": "Process videos in parallel for faster results",
 						"default":     true,
@@ -659,24 +653,24 @@ func (s *Server) getAvailableTools() []models.MCPTool {
 		tools = append(tools, models.MCPTool{
 			Name:        models.ToolTranslateTranscript,
 			Description: "Translate a video transcript to a target language",
-			InputSchema: map[string]interface{}{
+			InputSchema: map[string]any{
 				"type": "object",
-				"properties": map[string]interface{}{
-					"video_identifier": map[string]interface{}{
+				"properties": map[string]any{
+					"video_identifier": map[string]any{
 						"type":        "string",
 						"description": "YouTube video URL or ID",
 					},
-					"target_language": map[string]interface{}{
+					"target_language": map[string]any{
 						"type":        "string",
 						"description": "Target language code (e.g., 'ja', 'es', 'fr')",
 						"minLength":   2,
 						"maxLength":   5,
 					},
-					"source_language": map[string]interface{}{
+					"source_language": map[string]any{
 						"type":        "string",
 						"description": "Source language code (optional, auto-detected if not specified)",
 					},
-					"preserve_timestamps": map[string]interface{}{
+					"preserve_timestamps": map[string]any{
 						"type":        "boolean",
 						"description": "Whether to preserve timestamp information",
 						"default":     true,
@@ -691,31 +685,31 @@ func (s *Server) getAvailableTools() []models.MCPTool {
 		tools = append(tools, models.MCPTool{
 			Name:        models.ToolFormatTranscript,
 			Description: "Format a transcript in various styles",
-			InputSchema: map[string]interface{}{
+			InputSchema: map[string]any{
 				"type": "object",
-				"properties": map[string]interface{}{
-					"video_identifier": map[string]interface{}{
+				"properties": map[string]any{
+					"video_identifier": map[string]any{
 						"type":        "string",
 						"description": "YouTube video URL or ID",
 					},
-					"format_type": map[string]interface{}{
+					"format_type": map[string]any{
 						"type":        "string",
 						"enum":        []string{"plain_text", "paragraphs", "sentences", "srt", "vtt", "json"},
 						"description": "Output format type",
 						"default":     "plain_text",
 					},
-					"include_timestamps": map[string]interface{}{
+					"include_timestamps": map[string]any{
 						"type":        "boolean",
 						"description": "Include timestamps in the formatted output",
 						"default":     false,
 					},
-					"timestamp_format": map[string]interface{}{
+					"timestamp_format": map[string]any{
 						"type":        "string",
 						"enum":        []string{"seconds", "hms", "ms"},
 						"description": "Timestamp format (seconds, HH:MM:SS, or HH:MM:SS,mmm)",
 						"default":     "seconds",
 					},
-					"max_line_length": map[string]interface{}{
+					"max_line_length": map[string]any{
 						"type":        "integer",
 						"description": "Maximum characters per line (for subtitle formats)",
 						"default":     80,
@@ -732,14 +726,14 @@ func (s *Server) getAvailableTools() []models.MCPTool {
 		tools = append(tools, models.MCPTool{
 			Name:        models.ToolListLanguages,
 			Description: "List available transcript languages for a video",
-			InputSchema: map[string]interface{}{
+			InputSchema: map[string]any{
 				"type": "object",
-				"properties": map[string]interface{}{
-					"video_identifier": map[string]interface{}{
+				"properties": map[string]any{
+					"video_identifier": map[string]any{
 						"type":        "string",
 						"description": "YouTube video URL or ID",
 					},
-					"include_auto": map[string]interface{}{
+					"include_auto": map[string]any{
 						"type":        "boolean",
 						"description": "Include auto-generated transcripts in the list",
 						"default":     true,
@@ -764,8 +758,8 @@ func (s *Server) handleListResources(ctx context.Context, request models.MCPRequ
 	return &models.MCPResponse{
 		JSONRPC: "2.0",
 		ID:      request.ID,
-		Result: map[string]interface{}{
-			"resources": []interface{}{},
+		Result: map[string]any{
+			"resources": []any{},
 		},
 	}
 }
@@ -787,8 +781,8 @@ func (s *Server) handleListPrompts(ctx context.Context, request models.MCPReques
 	return &models.MCPResponse{
 		JSONRPC: "2.0",
 		ID:      request.ID,
-		Result: map[string]interface{}{
-			"prompts": []interface{}{},
+		Result: map[string]any{
+			"prompts": []any{},
 		},
 	}
 }
@@ -806,7 +800,7 @@ func (s *Server) handleSetLoggingLevel(ctx context.Context, request models.MCPRe
 		return s.errorResponse(request.ID, models.MCPErrorCodeMethodNotFound, "Logging control not enabled")
 	}
 
-	params, ok := request.Params.(map[string]interface{})
+	params, ok := request.Params.(map[string]any)
 	if !ok {
 		return s.errorResponse(request.ID, models.MCPErrorCodeInvalidParams, "Invalid parameters")
 	}
@@ -835,13 +829,13 @@ func (s *Server) handleSetLoggingLevel(ctx context.Context, request models.MCPRe
 	return &models.MCPResponse{
 		JSONRPC: "2.0",
 		ID:      request.ID,
-		Result:  map[string]interface{}{"success": true},
+		Result:  map[string]any{"success": true},
 	}
 }
 
 // Helper methods
 
-func (s *Server) mapToStruct(input map[string]interface{}, output interface{}) error {
+func (s *Server) mapToStruct(input map[string]any, output any) error {
 	jsonBytes, err := json.Marshal(input)
 	if err != nil {
 		return err
@@ -849,7 +843,7 @@ func (s *Server) mapToStruct(input map[string]interface{}, output interface{}) e
 	return json.Unmarshal(jsonBytes, output)
 }
 
-func (s *Server) errorResponse(id interface{}, code int, message string) *models.MCPResponse {
+func (s *Server) errorResponse(id any, code int, message string) *models.MCPResponse {
 	return &models.MCPResponse{
 		JSONRPC: "2.0",
 		ID:      id,
@@ -860,7 +854,7 @@ func (s *Server) errorResponse(id interface{}, code int, message string) *models
 	}
 }
 
-func (s *Server) sendError(w http.ResponseWriter, id interface{}, code int, message string, data interface{}) {
+func (s *Server) sendError(w http.ResponseWriter, id any, code int, message string, data any) {
 	response := &models.MCPResponse{
 		JSONRPC: "2.0",
 		ID:      id,
@@ -873,7 +867,9 @@ func (s *Server) sendError(w http.ResponseWriter, id interface{}, code int, mess
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK) // MCP uses 200 OK even for errors
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 func (s *Server) incrementRequestCount() {
@@ -891,17 +887,17 @@ func (s *Server) trackToolExecution(toolName string, start bool) {
 }
 
 // GetStats returns server statistics
-func (s *Server) GetStats() map[string]interface{} {
+func (s *Server) GetStats() map[string]any {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	activeToolCount := 0
-	s.activeTools.Range(func(key, value interface{}) bool {
+	s.activeTools.Range(func(key, value any) bool {
 		activeToolCount++
 		return true
 	})
 
-	return map[string]interface{}{
+	return map[string]any{
 		"request_count":    s.requestCount,
 		"active_tools":     activeToolCount,
 		"enabled_tools":    s.getEnabledToolCount(),

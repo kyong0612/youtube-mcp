@@ -1,8 +1,10 @@
+// Package health provides health check functionality for monitoring system components.
 package health
 
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -15,24 +17,24 @@ import (
 type Checker struct {
 	cache   cache.Cache
 	youtube *youtube.Service
-	mu      sync.RWMutex
 	checks  map[string]CheckResult
+	mu      sync.RWMutex
 }
 
 // CheckResult represents the result of a health check
 type CheckResult struct {
-	Status    string                 `json:"status"` // "healthy", "degraded", "unhealthy"
-	Message   string                 `json:"message,omitempty"`
-	Timestamp time.Time              `json:"timestamp"`
-	Details   map[string]interface{} `json:"details,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
+	Details   map[string]any `json:"details,omitempty"`
+	Status    string         `json:"status"`
+	Message   string         `json:"message,omitempty"`
 }
 
-// HealthStatus represents the overall health status
-type HealthStatus struct {
-	Status    string                 `json:"status"` // "healthy", "degraded", "unhealthy"
+// Status represents the overall health status
+type Status struct {
 	Timestamp time.Time              `json:"timestamp"`
-	Version   string                 `json:"version"`
 	Checks    map[string]CheckResult `json:"checks"`
+	Status    string                 `json:"status"`
+	Version   string                 `json:"version"`
 	TotalMS   int64                  `json:"total_ms"`
 }
 
@@ -46,7 +48,7 @@ func NewChecker(cache cache.Cache, youtube *youtube.Service) *Checker {
 }
 
 // CheckHealth performs all health checks
-func (c *Checker) CheckHealth(ctx context.Context) *HealthStatus {
+func (c *Checker) CheckHealth(ctx context.Context) *Status {
 	start := time.Now()
 
 	// Run all checks in parallel
@@ -95,7 +97,7 @@ func (c *Checker) CheckHealth(ctx context.Context) *HealthStatus {
 		}
 	}
 
-	return &HealthStatus{
+	return &Status{
 		Status:    overallStatus,
 		Timestamp: time.Now().UTC(),
 		Checks:    results,
@@ -117,7 +119,7 @@ func (c *Checker) checkCache(ctx context.Context) CheckResult {
 			Status:    "unhealthy",
 			Message:   fmt.Sprintf("Failed to set cache value: %v", err),
 			Timestamp: time.Now().UTC(),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"operation":  "set",
 				"latency_ms": time.Since(start).Milliseconds(),
 			},
@@ -131,7 +133,7 @@ func (c *Checker) checkCache(ctx context.Context) CheckResult {
 			Status:    "unhealthy",
 			Message:   "Failed to retrieve cached value",
 			Timestamp: time.Now().UTC(),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"operation":  "get",
 				"latency_ms": time.Since(start).Milliseconds(),
 			},
@@ -144,7 +146,7 @@ func (c *Checker) checkCache(ctx context.Context) CheckResult {
 			Status:    "unhealthy",
 			Message:   "Cache returned incorrect value",
 			Timestamp: time.Now().UTC(),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"expected":   testValue,
 				"actual":     value,
 				"latency_ms": time.Since(start).Milliseconds(),
@@ -153,7 +155,9 @@ func (c *Checker) checkCache(ctx context.Context) CheckResult {
 	}
 
 	// Clean up
-	c.cache.Delete(ctx, testKey)
+	if err := c.cache.Delete(ctx, testKey); err != nil {
+		slog.Warn("Failed to delete test key from cache", "error", err)
+	}
 
 	// Get cache size
 	size := c.cache.Size(ctx)
@@ -161,7 +165,7 @@ func (c *Checker) checkCache(ctx context.Context) CheckResult {
 	return CheckResult{
 		Status:    "healthy",
 		Timestamp: time.Now().UTC(),
-		Details: map[string]interface{}{
+		Details: map[string]any{
 			"cache_size": size,
 			"latency_ms": time.Since(start).Milliseconds(),
 		},
@@ -191,7 +195,7 @@ func (c *Checker) checkYouTube(ctx context.Context) CheckResult {
 			Status:    "unhealthy",
 			Message:   fmt.Sprintf("YouTube service check failed: %v", err),
 			Timestamp: time.Now().UTC(),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"error_type": errorType,
 				"latency_ms": time.Since(start).Milliseconds(),
 			},
@@ -207,7 +211,7 @@ func (c *Checker) checkYouTube(ctx context.Context) CheckResult {
 	return CheckResult{
 		Status:    status,
 		Timestamp: time.Now().UTC(),
-		Details: map[string]interface{}{
+		Details: map[string]any{
 			"latency_ms": latency,
 		},
 	}
@@ -237,12 +241,16 @@ func (c *Checker) checkNetwork(ctx context.Context) CheckResult {
 			Status:    "unhealthy",
 			Message:   fmt.Sprintf("Network check failed: %v", err),
 			Timestamp: time.Now().UTC(),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"latency_ms": time.Since(start).Milliseconds(),
 			},
 		}
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("Failed to close response body", "error", err)
+		}
+	}()
 
 	latency := time.Since(start).Milliseconds()
 	status := "healthy"
@@ -260,7 +268,7 @@ func (c *Checker) checkNetwork(ctx context.Context) CheckResult {
 		Status:    status,
 		Message:   message,
 		Timestamp: time.Now().UTC(),
-		Details: map[string]interface{}{
+		Details: map[string]any{
 			"status_code": resp.StatusCode,
 			"latency_ms":  latency,
 		},

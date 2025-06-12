@@ -9,28 +9,29 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/youtube-transcript-mcp/internal/config"
 	"github.com/youtube-transcript-mcp/internal/models"
-	"golang.org/x/time/rate"
 )
 
 // Mock cache for testing
 type mockCache struct {
-	data map[string]interface{}
+	data map[string]any
 }
 
 func newMockCache() *mockCache {
 	return &mockCache{
-		data: make(map[string]interface{}),
+		data: make(map[string]any),
 	}
 }
 
-func (m *mockCache) Get(ctx context.Context, key string) (interface{}, bool) {
+func (m *mockCache) Get(ctx context.Context, key string) (any, bool) {
 	val, ok := m.data[key]
 	return val, ok
 }
 
-func (m *mockCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+func (m *mockCache) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
 	m.data[key] = value
 	return nil
 }
@@ -41,7 +42,7 @@ func (m *mockCache) Delete(ctx context.Context, key string) error {
 }
 
 func (m *mockCache) Clear(ctx context.Context) error {
-	m.data = make(map[string]interface{})
+	m.data = make(map[string]any)
 	return nil
 }
 
@@ -193,14 +194,14 @@ func TestFormatSRTTime(t *testing.T) {
 	s := &Service{}
 
 	tests := []struct {
-		seconds  float64
 		expected string
+		seconds  float64
 	}{
-		{0, "00:00:00,000"},
-		{1.5, "00:00:01,500"},
-		{65.123, "00:01:05,123"},
-		{3665.999, "01:01:05,999"},
-		{7200, "02:00:00,000"},
+		{"00:00:00,000", 0.0},
+		{"00:00:01,500", 1.5},
+		{"00:01:05,123", 65.123},
+		{"01:01:05,999", 3665.999},
+		{"02:00:00,000", 7200.0},
 	}
 
 	for _, tt := range tests {
@@ -215,14 +216,14 @@ func TestFormatVTTTime(t *testing.T) {
 	s := &Service{}
 
 	tests := []struct {
-		seconds  float64
 		expected string
+		seconds  float64
 	}{
-		{0, "00:00:00.000"},
-		{1.5, "00:00:01.500"},
-		{65.123, "00:01:05.123"},
-		{3665.999, "01:01:05.999"},
-		{7200, "02:00:00.000"},
+		{"00:00:00.000", 0.0},
+		{"00:00:01.500", 1.5},
+		{"00:01:05.123", 65.123},
+		{"01:01:05.999", 3665.999},
+		{"02:00:00.000", 7200.0},
 	}
 
 	for _, tt := range tests {
@@ -304,8 +305,8 @@ func TestSelectBestTrack(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		languages []string
 		expected  string
+		languages []string
 	}{
 		{
 			name:      "exact match",
@@ -403,8 +404,8 @@ func TestFormatAsSRT(t *testing.T) {
 	s := &Service{}
 
 	segments := []models.TranscriptSegment{
-		{Text: "Hello", Start: 0, Duration: 2, End: 2},
-		{Text: "world", Start: 2, Duration: 3, End: 5},
+		{Text: "Hello", Start: 0.0, Duration: 2.0, End: 2.0},
+		{Text: "world", Start: 2.0, Duration: 3.0, End: 5.0},
 	}
 
 	result := s.formatAsSRT(segments)
@@ -425,8 +426,8 @@ func TestFormatAsVTT(t *testing.T) {
 	s := &Service{}
 
 	segments := []models.TranscriptSegment{
-		{Text: "Hello", Start: 0, Duration: 2, End: 2},
-		{Text: "world", Start: 2, Duration: 3, End: 5},
+		{Text: "Hello", Start: 0.0, Duration: 2.0, End: 2.0},
+		{Text: "world", Start: 2.0, Duration: 3.0, End: 5.0},
 	}
 
 	result := s.formatAsVTT(segments)
@@ -471,7 +472,10 @@ func TestProxyManager(t *testing.T) {
 	}
 
 	// Test wrap around
-	_, _ = pm.GetProxy(req) // third proxy
+	_, err = pm.GetProxy(req) // third proxy
+	if err != nil {
+		t.Fatalf("Failed to get third proxy: %v", err)
+	}
 	proxy4, err := pm.GetProxy(req)
 	if err != nil {
 		t.Fatalf("Failed to get proxy: %v", err)
@@ -507,7 +511,6 @@ func TestServiceWithCache(t *testing.T) {
 		t.Error("Expected logger to be set")
 	}
 }
-
 
 func TestParseTranscriptXML(t *testing.T) {
 	s := &Service{
