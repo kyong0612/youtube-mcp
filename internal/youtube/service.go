@@ -1179,7 +1179,9 @@ func (s *Service) doHTTPRequestWithRetry(ctx context.Context, req *http.Request)
 
 		// Check for retryable HTTP status codes
 		if resp.StatusCode >= 500 || resp.StatusCode == 429 {
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				slog.Warn("Failed to close response body", "error", err)
+			}
 			return fmt.Errorf("HTTP error: %d", resp.StatusCode)
 		}
 

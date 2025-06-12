@@ -166,7 +166,10 @@ func (s *Server) handleCallTool(ctx context.Context, request models.MCPRequest) 
 
 	// Extract tool call parameters
 	var toolCall models.MCPToolCallParams
-	paramsBytes, _ := json.Marshal(params)
+	paramsBytes, err := json.Marshal(params)
+	if err != nil {
+		return s.errorResponse(request.ID, models.MCPErrorCodeInvalidParams, fmt.Sprintf("Failed to marshal params: %v", err))
+	}
 	if err := json.Unmarshal(paramsBytes, &toolCall); err != nil {
 		return s.errorResponse(request.ID, models.MCPErrorCodeInvalidParams, "Invalid tool call parameters")
 	}
@@ -874,7 +877,9 @@ func (s *Server) sendError(w http.ResponseWriter, id any, code int, message stri
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK) // MCP uses 200 OK even for errors
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Error("Failed to encode response", "error", err)
+	}
 }
 
 func (s *Server) incrementRequestCount() {
