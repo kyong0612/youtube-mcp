@@ -8,7 +8,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/time v0.11.0
+	golang.org/x/time v0.12.0
 )
 
 tool github.com/air-verse/air
