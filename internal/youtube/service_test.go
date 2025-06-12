@@ -9,28 +9,29 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/youtube-transcript-mcp/internal/config"
 	"github.com/youtube-transcript-mcp/internal/models"
-	"golang.org/x/time/rate"
 )
 
 // Mock cache for testing
 type mockCache struct {
-	data map[string]interface{}
+	data map[string]any
 }
 
 func newMockCache() *mockCache {
 	return &mockCache{
-		data: make(map[string]interface{}),
+		data: make(map[string]any),
 	}
 }
 
-func (m *mockCache) Get(ctx context.Context, key string) (interface{}, bool) {
+func (m *mockCache) Get(ctx context.Context, key string) (any, bool) {
 	val, ok := m.data[key]
 	return val, ok
 }
 
-func (m *mockCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+func (m *mockCache) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
 	m.data[key] = value
 	return nil
 }
@@ -41,7 +42,7 @@ func (m *mockCache) Delete(ctx context.Context, key string) error {
 }
 
 func (m *mockCache) Clear(ctx context.Context) error {
-	m.data = make(map[string]interface{})
+	m.data = make(map[string]any)
 	return nil
 }
 
@@ -193,8 +194,8 @@ func TestFormatSRTTime(t *testing.T) {
 	s := &Service{}
 
 	tests := []struct {
-		seconds  float64
 		expected string
+		seconds  float64
 	}{
 		{0, "00:00:00,000"},
 		{1.5, "00:00:01,500"},
@@ -215,8 +216,8 @@ func TestFormatVTTTime(t *testing.T) {
 	s := &Service{}
 
 	tests := []struct {
-		seconds  float64
 		expected string
+		seconds  float64
 	}{
 		{0, "00:00:00.000"},
 		{1.5, "00:00:01.500"},
@@ -304,8 +305,8 @@ func TestSelectBestTrack(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		languages []string
 		expected  string
+		languages []string
 	}{
 		{
 			name:      "exact match",

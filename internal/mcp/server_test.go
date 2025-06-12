@@ -122,7 +122,7 @@ func TestHandleMCP_Initialize(t *testing.T) {
 		t.Errorf("Unexpected error: %v", response.Error)
 	}
 
-	result, ok := response.Result.(map[string]interface{})
+	result, ok := response.Result.(map[string]any)
 	if !ok {
 		t.Fatal("Expected result to be a map")
 	}
@@ -168,12 +168,12 @@ func TestHandleMCP_ListTools(t *testing.T) {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
 
-	result, ok := response.Result.(map[string]interface{})
+	result, ok := response.Result.(map[string]any)
 	if !ok {
 		t.Fatal("Expected result to be a map")
 	}
 
-	tools, ok := result["tools"].([]interface{})
+	tools, ok := result["tools"].([]any)
 	if !ok {
 		t.Fatal("Expected tools to be an array")
 	}
@@ -214,9 +214,9 @@ func TestHandleMCP_CallTool_GetTranscript(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      1,
 		Method:  models.MCPMethodCallTool,
-		Params: map[string]interface{}{
+		Params: map[string]any{
 			"name": "get_transcript",
-			"arguments": map[string]interface{}{
+			"arguments": map[string]any{
 				"video_identifier": "test123",
 				"languages":        []string{"en"},
 			},
@@ -242,12 +242,12 @@ func TestHandleMCP_CallTool_GetTranscript(t *testing.T) {
 		t.Errorf("Unexpected error: %v", response.Error)
 	}
 
-	result, ok := response.Result.(map[string]interface{})
+	result, ok := response.Result.(map[string]any)
 	if !ok {
 		t.Fatal("Expected result to be a map")
 	}
 
-	content, ok := result["content"].([]interface{})
+	content, ok := result["content"].([]any)
 	if !ok || len(content) == 0 {
 		t.Fatal("Expected content array")
 	}
@@ -343,9 +343,9 @@ func TestHandleMCP_DisabledTool(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      1,
 		Method:  models.MCPMethodCallTool,
-		Params: map[string]interface{}{
+		Params: map[string]any{
 			"name": "get_transcript",
-			"arguments": map[string]interface{}{
+			"arguments": map[string]any{
 				"video_identifier": "test123",
 			},
 		},
@@ -415,9 +415,9 @@ func TestGetStats(t *testing.T) {
 func TestMapToStruct(t *testing.T) {
 	server := &Server{}
 
-	input := map[string]interface{}{
+	input := map[string]any{
 		"video_identifier":    "test123",
-		"languages":           []interface{}{"en", "ja"},
+		"languages":           []any{"en", "ja"},
 		"preserve_formatting": true,
 	}
 
@@ -459,9 +459,9 @@ func TestValidation(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      1,
 		Method:  models.MCPMethodCallTool,
-		Params: map[string]interface{}{
+		Params: map[string]any{
 			"name": "get_transcript",
-			"arguments": map[string]interface{}{
+			"arguments": map[string]any{
 				// Missing video_identifier
 				"languages": []string{"en"},
 			},

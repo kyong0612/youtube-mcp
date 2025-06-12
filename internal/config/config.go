@@ -12,56 +12,56 @@ import (
 
 // Config represents the complete application configuration
 type Config struct {
-	Server   ServerConfig   `json:"server"`
 	YouTube  YouTubeConfig  `json:"youtube"`
-	MCP      MCPConfig      `json:"mcp"`
-	Cache    CacheConfig    `json:"cache"`
 	Security SecurityConfig `json:"security"`
-	Logging  LoggingConfig  `json:"logging"`
 	Metrics  MetricsConfig  `json:"metrics"`
+	Server   ServerConfig   `json:"server"`
+	Cache    CacheConfig    `json:"cache"`
+	MCP      MCPConfig      `json:"mcp"`
+	Logging  LoggingConfig  `json:"logging"`
 }
 
 // ServerConfig represents HTTP server configuration
 type ServerConfig struct {
-	Port            int           `json:"port"`
 	Host            string        `json:"host"`
+	CORSOrigins     []string      `json:"cors_origins"`
+	Port            int           `json:"port"`
 	ReadTimeout     time.Duration `json:"read_timeout"`
 	WriteTimeout    time.Duration `json:"write_timeout"`
 	IdleTimeout     time.Duration `json:"idle_timeout"`
 	ShutdownTimeout time.Duration `json:"shutdown_timeout"`
 	MaxRequestSize  int64         `json:"max_request_size"`
 	EnableCORS      bool          `json:"enable_cors"`
-	CORSOrigins     []string      `json:"cors_origins"`
 	EnableGzip      bool          `json:"enable_gzip"`
 }
 
 // YouTubeConfig represents YouTube-specific configuration
 type YouTubeConfig struct {
-	APIKey              string        `json:"api_key"`
-	DefaultLanguages    []string      `json:"default_languages"`
-	RequestTimeout      time.Duration `json:"request_timeout"`
-	RetryAttempts       int           `json:"retry_attempts"`
-	RetryDelay          time.Duration `json:"retry_delay"`
-	RetryBackoffFactor  float64       `json:"retry_backoff_factor"`
-	RateLimitPerMinute  int           `json:"rate_limit_per_minute"`
-	RateLimitPerHour    int           `json:"rate_limit_per_hour"`
 	UserAgent           string        `json:"user_agent"`
-	ProxyURL            string        `json:"proxy_url"`
-	EnableProxyRotation bool          `json:"enable_proxy_rotation"`
-	ProxyList           []string      `json:"proxy_list"`
-	MaxConcurrent       int           `json:"max_concurrent"`
-	CookieFile          string        `json:"cookie_file"`
-	EnableCookies       bool          `json:"enable_cookies"`
 	YoutubeDLPath       string        `json:"youtubedl_path"`
+	CookieFile          string        `json:"cookie_file"`
+	APIKey              string        `json:"api_key"`
+	ProxyURL            string        `json:"proxy_url"`
+	DefaultLanguages    []string      `json:"default_languages"`
+	ProxyList           []string      `json:"proxy_list"`
+	RetryDelay          time.Duration `json:"retry_delay"`
+	RateLimitPerHour    int           `json:"rate_limit_per_hour"`
+	RateLimitPerMinute  int           `json:"rate_limit_per_minute"`
+	RetryBackoffFactor  float64       `json:"retry_backoff_factor"`
+	MaxConcurrent       int           `json:"max_concurrent"`
+	RetryAttempts       int           `json:"retry_attempts"`
+	RequestTimeout      time.Duration `json:"request_timeout"`
+	EnableProxyRotation bool          `json:"enable_proxy_rotation"`
+	EnableCookies       bool          `json:"enable_cookies"`
 	EnableYoutubeDL     bool          `json:"enable_youtubedl"`
 }
 
 // MCPConfig represents MCP-specific configuration
 type MCPConfig struct {
+	Tools           map[string]bool `json:"tools"`
 	Version         string          `json:"version"`
 	ServerName      string          `json:"server_name"`
 	ServerVersion   string          `json:"server_version"`
-	Tools           map[string]bool `json:"tools"`
 	MaxConcurrent   int             `json:"max_concurrent"`
 	RequestTimeout  time.Duration   `json:"request_timeout"`
 	MaxRequestSize  int64           `json:"max_request_size"`
@@ -72,35 +72,35 @@ type MCPConfig struct {
 
 // CacheConfig represents cache configuration
 type CacheConfig struct {
-	Type              string        `json:"type"` // "memory", "redis", "memcached"
-	Enabled           bool          `json:"enabled"`
-	TranscriptTTL     time.Duration `json:"transcript_ttl"`
+	Type              string        `json:"type"`
+	RedisPassword     string        `json:"redis_password"`
+	RedisURL          string        `json:"redis_url"`
 	MetadataTTL       time.Duration `json:"metadata_ttl"`
 	LanguagesTTL      time.Duration `json:"languages_ttl"`
 	ErrorTTL          time.Duration `json:"error_ttl"`
 	MaxSize           int           `json:"max_size"`
 	MaxMemoryMB       int           `json:"max_memory_mb"`
 	CleanupInterval   time.Duration `json:"cleanup_interval"`
-	RedisURL          string        `json:"redis_url"`
-	RedisPassword     string        `json:"redis_password"`
+	TranscriptTTL     time.Duration `json:"transcript_ttl"`
 	RedisDB           int           `json:"redis_db"`
 	RedisPoolSize     int           `json:"redis_pool_size"`
+	Enabled           bool          `json:"enabled"`
 	EnableCompression bool          `json:"enable_compression"`
 }
 
 // SecurityConfig represents security configuration
 type SecurityConfig struct {
-	EnableAuth        bool          `json:"enable_auth"`
-	APIKeys           []string      `json:"api_keys"`
 	JWTSecret         string        `json:"jwt_secret"`
+	APIKeys           []string      `json:"api_keys"`
+	IPWhitelist       []string      `json:"ip_whitelist"`
+	IPBlacklist       []string      `json:"ip_blacklist"`
 	JWTExpiry         time.Duration `json:"jwt_expiry"`
-	EnableRateLimit   bool          `json:"enable_rate_limit"`
 	RateLimitPerIP    int           `json:"rate_limit_per_ip"`
 	RateLimitWindow   time.Duration `json:"rate_limit_window"`
+	EnableAuth        bool          `json:"enable_auth"`
+	EnableRateLimit   bool          `json:"enable_rate_limit"`
 	EnableIPWhitelist bool          `json:"enable_ip_whitelist"`
-	IPWhitelist       []string      `json:"ip_whitelist"`
 	EnableIPBlacklist bool          `json:"enable_ip_blacklist"`
-	IPBlacklist       []string      `json:"ip_blacklist"`
 }
 
 // LoggingConfig represents logging configuration
@@ -121,9 +121,9 @@ type LoggingConfig struct {
 
 // MetricsConfig represents metrics configuration
 type MetricsConfig struct {
-	Enabled         bool   `json:"enabled"`
-	Port            int    `json:"port"`
 	Path            string `json:"path"`
+	Port            int    `json:"port"`
+	Enabled         bool   `json:"enabled"`
 	EnableHistogram bool   `json:"enable_histogram"`
 	EnableSummary   bool   `json:"enable_summary"`
 }

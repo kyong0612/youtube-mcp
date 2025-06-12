@@ -111,10 +111,10 @@ func TestLoadWithEnvironmentVariables(t *testing.T) {
 
 func TestConfigValidation(t *testing.T) {
 	tests := []struct {
-		name      string
 		setupFunc func(*Config)
-		wantErr   bool
+		name      string
 		errMsg    string
+		wantErr   bool
 	}{
 		{
 			name: "invalid port - too low",

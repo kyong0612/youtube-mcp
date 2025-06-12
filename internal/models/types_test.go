@@ -78,7 +78,7 @@ func TestMCPError_Error(t *testing.T) {
 			err: &MCPError{
 				Code:    MCPErrorCodeInternalError,
 				Message: "Internal server error",
-				Data:    map[string]interface{}{"details": "database connection failed"},
+				Data:    map[string]any{"details": "database connection failed"},
 			},
 			want: "Internal server error",
 		},

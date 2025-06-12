@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
 	"github.com/youtube-transcript-mcp/internal/cache"
 	"github.com/youtube-transcript-mcp/internal/config"
 	"github.com/youtube-transcript-mcp/internal/health"
@@ -34,9 +35,9 @@ var (
 
 // Global server state
 type serverState struct {
+	healthChecker *health.Checker
 	ready         atomic.Bool
 	healthy       atomic.Bool
-	healthChecker *health.Checker
 }
 
 func main() {
@@ -528,7 +529,7 @@ func handleReady(w http.ResponseWriter, r *http.Request) {
 		statusCode = http.StatusServiceUnavailable
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"status":    status,
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	}
@@ -542,7 +543,7 @@ func handleReady(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleVersion(w http.ResponseWriter, r *http.Request) {
-	response := map[string]interface{}{
+	response := map[string]any{
 		"version":    Version,
 		"build_time": BuildTime,
 		"git_commit": GitCommit,

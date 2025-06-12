@@ -16,31 +16,32 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/youtube-transcript-mcp/internal/cache"
 	"github.com/youtube-transcript-mcp/internal/config"
 	"github.com/youtube-transcript-mcp/internal/models"
-	"golang.org/x/time/rate"
 )
 
 // Service handles YouTube transcript operations
 type Service struct {
-	config         config.YouTubeConfig
-	httpClient     *http.Client
 	cache          cache.Cache
+	httpClient     *http.Client
 	rateLimiter    *rate.Limiter
 	hourlyLimiter  *rate.Limiter
 	proxyManager   *ProxyManager
 	logger         *slog.Logger
 	rateLimitState *RateLimitState
+	config         config.YouTubeConfig
 }
 
 // RateLimitState tracks rate limiting state for adaptive behavior
 type RateLimitState struct {
-	mu                  sync.RWMutex
-	consecutiveFailures int
 	lastFailureTime     time.Time
 	backoffUntil        time.Time
+	consecutiveFailures int
 	adaptiveMultiplier  float64
+	mu                  sync.RWMutex
 }
 
 // ProxyManager manages proxy rotation
@@ -624,9 +625,9 @@ func (s *Service) fetchTranscriptFromTrack(ctx context.Context, track *CaptionTr
 
 // Text represents a text element in XML transcripts
 type Text struct {
+	Text  string  `xml:",chardata"`
 	Start float64 `xml:"start,attr"`
 	Dur   float64 `xml:"dur,attr"`
-	Text  string  `xml:",chardata"`
 }
 
 // parseTranscriptXML parses YouTube's transcript XML format with improved error handling
@@ -658,18 +659,18 @@ func (s *Service) parseTranscriptXML(data []byte) ([]models.TranscriptSegment, e
 		XMLName xml.Name `xml:"timedtext"`
 		Head    struct {
 			Ws struct {
-				WinStyles []interface{} `xml:"ws"`
+				WinStyles []any `xml:"ws"`
 			} `xml:"ws"`
 			Wp struct {
-				PenStyles []interface{} `xml:"wp"`
+				PenStyles []any `xml:"wp"`
 			} `xml:"wp"`
 		} `xml:"head"`
 		Body struct {
 			Paragraphs []struct {
+				Text      string  `xml:",chardata"`
+				Sentences []Text  `xml:"s"`
 				Start     float64 `xml:"t,attr"`
 				Dur       float64 `xml:"d,attr"`
-				Sentences []Text  `xml:"s"`
-				Text      string  `xml:",chardata"`
 			} `xml:"p"`
 			Texts []Text `xml:"text"`
 		} `xml:"body"`
@@ -1217,11 +1218,11 @@ type VideoData struct {
 	ChannelID     string
 	ChannelName   string
 	PublishedAt   string
+	CaptionTracks []CaptionTrack
 	ViewCount     int64
 	LikeCount     int64
 	CommentCount  int64
 	IsLive        bool
-	CaptionTracks []CaptionTrack
 }
 
 type PlayerResponse struct {

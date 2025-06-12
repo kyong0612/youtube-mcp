@@ -12,15 +12,24 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/youtube-transcript-mcp/internal/models"
 )
 
 func TestMain(m *testing.M) {
 	// Setup test environment
-	os.Setenv("PORT", "0")          // Use random port for testing
-	os.Setenv("LOG_LEVEL", "error") // Reduce log noise
-	os.Setenv("CACHE_ENABLED", "true")
-	os.Setenv("MCP_REQUEST_TIMEOUT", "5s")
+	if err := os.Setenv("PORT", "0"); err != nil { // Use random port for testing
+		panic(err)
+	}
+	if err := os.Setenv("LOG_LEVEL", "error"); err != nil { // Reduce log noise
+		panic(err)
+	}
+	if err := os.Setenv("CACHE_ENABLED", "true"); err != nil {
+		panic(err)
+	}
+	if err := os.Setenv("MCP_REQUEST_TIMEOUT", "5s"); err != nil {
+		panic(err)
+	}
 
 	// Run tests
 	code := m.Run()
@@ -63,7 +72,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response map[string]interface{}
+	var response map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 
@@ -83,7 +92,7 @@ func TestReadyEndpoint(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response map[string]interface{}
+	var response map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 
@@ -96,10 +105,10 @@ func TestMCPEndpointIntegration(t *testing.T) {
 	router := setupTestRouter()
 
 	tests := []struct {
-		name           string
 		request        models.MCPRequest
-		expectedStatus int
 		checkResponse  func(t *testing.T, response models.MCPResponse)
+		name           string
+		expectedStatus int
 	}{
 		{
 			name: "initialize request",
@@ -133,9 +142,9 @@ func TestMCPEndpointIntegration(t *testing.T) {
 				JSONRPC: "2.0",
 				ID:      3,
 				Method:  models.MCPMethodCallTool,
-				Params: map[string]interface{}{
+				Params: map[string]any{
 					"name": "get_transcript",
-					"arguments": map[string]interface{}{
+					"arguments": map[string]any{
 						"video_identifier": "dQw4w9WgXcQ",
 						"languages":        []string{"en"},
 					},
@@ -202,7 +211,11 @@ func TestGracefulShutdown(t *testing.T) {
 	}
 
 	// Start server
-	go server.ListenAndServe()
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			t.Logf("Server error: %v", err)
+		}
+	}()
 	time.Sleep(50 * time.Millisecond)
 
 	// Shutdown with timeout
@@ -215,9 +228,9 @@ func TestGracefulShutdown(t *testing.T) {
 
 func TestEnvironmentConfiguration(t *testing.T) {
 	tests := []struct {
-		name     string
 		envVars  map[string]string
 		validate func(t *testing.T)
+		name     string
 	}{
 		{
 			name: "custom port",
@@ -259,7 +272,8 @@ func TestEnvironmentConfiguration(t *testing.T) {
 
 			// Set test values
 			for k, v := range tt.envVars {
-				os.Setenv(k, v)
+				err := os.Setenv(k, v)
+				require.NoError(t, err)
 			}
 
 			// Validate
@@ -268,9 +282,11 @@ func TestEnvironmentConfiguration(t *testing.T) {
 			// Restore original values
 			for k, v := range originals {
 				if v == "" {
-					os.Unsetenv(k)
+					err := os.Unsetenv(k)
+					require.NoError(t, err)
 				} else {
-					os.Setenv(k, v)
+					err := os.Setenv(k, v)
+					require.NoError(t, err)
 				}
 			}
 		})
@@ -292,7 +308,8 @@ func TestConcurrentRequests(t *testing.T) {
 				Method:  models.MCPMethodListTools,
 			}
 
-			body, _ := json.Marshal(request)
+			body, err := json.Marshal(request)
+			require.NoError(t, err)
 			req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
@@ -370,40 +387,52 @@ func setupTestRouter() http.Handler {
 
 	// Health endpoints
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"status":    "healthy",
 			"timestamp": time.Now().UTC(),
 			"version":   "1.0.0",
-		})
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 	})
 
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"status":    "ready",
 			"timestamp": time.Now().UTC(),
-		})
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 	})
 
 	// MCP endpoint (simplified)
 	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
 		var request models.MCPRequest
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			json.NewEncoder(w).Encode(models.MCPResponse{
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(models.MCPResponse{
 				JSONRPC: "2.0",
 				Error: &models.MCPError{
 					Code:    models.MCPErrorCodeParseError,
 					Message: "Parse error",
 				},
-			})
+			}); err != nil {
+				http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
+			}
 			return
 		}
 
 		// Simple response for testing
-		json.NewEncoder(w).Encode(models.MCPResponse{
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(models.MCPResponse{
 			JSONRPC: "2.0",
 			ID:      request.ID,
-			Result:  map[string]interface{}{"status": "ok"},
-		})
+			Result:  map[string]any{"status": "ok"},
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 	})
 
 	// Wrap with CORS middleware

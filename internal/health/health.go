@@ -16,24 +16,24 @@ import (
 type Checker struct {
 	cache   cache.Cache
 	youtube *youtube.Service
-	mu      sync.RWMutex
 	checks  map[string]CheckResult
+	mu      sync.RWMutex
 }
 
 // CheckResult represents the result of a health check
 type CheckResult struct {
-	Status    string                 `json:"status"` // "healthy", "degraded", "unhealthy"
-	Message   string                 `json:"message,omitempty"`
-	Timestamp time.Time              `json:"timestamp"`
-	Details   map[string]interface{} `json:"details,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
+	Details   map[string]any `json:"details,omitempty"`
+	Status    string         `json:"status"`
+	Message   string         `json:"message,omitempty"`
 }
 
 // Status represents the overall health status
 type Status struct {
-	Status    string                 `json:"status"` // "healthy", "degraded", "unhealthy"
 	Timestamp time.Time              `json:"timestamp"`
-	Version   string                 `json:"version"`
 	Checks    map[string]CheckResult `json:"checks"`
+	Status    string                 `json:"status"`
+	Version   string                 `json:"version"`
 	TotalMS   int64                  `json:"total_ms"`
 }
 
@@ -118,7 +118,7 @@ func (c *Checker) checkCache(ctx context.Context) CheckResult {
 			Status:    "unhealthy",
 			Message:   fmt.Sprintf("Failed to set cache value: %v", err),
 			Timestamp: time.Now().UTC(),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"operation":  "set",
 				"latency_ms": time.Since(start).Milliseconds(),
 			},
@@ -132,7 +132,7 @@ func (c *Checker) checkCache(ctx context.Context) CheckResult {
 			Status:    "unhealthy",
 			Message:   "Failed to retrieve cached value",
 			Timestamp: time.Now().UTC(),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"operation":  "get",
 				"latency_ms": time.Since(start).Milliseconds(),
 			},
@@ -145,7 +145,7 @@ func (c *Checker) checkCache(ctx context.Context) CheckResult {
 			Status:    "unhealthy",
 			Message:   "Cache returned incorrect value",
 			Timestamp: time.Now().UTC(),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"expected":   testValue,
 				"actual":     value,
 				"latency_ms": time.Since(start).Milliseconds(),
@@ -162,7 +162,7 @@ func (c *Checker) checkCache(ctx context.Context) CheckResult {
 	return CheckResult{
 		Status:    "healthy",
 		Timestamp: time.Now().UTC(),
-		Details: map[string]interface{}{
+		Details: map[string]any{
 			"cache_size": size,
 			"latency_ms": time.Since(start).Milliseconds(),
 		},
@@ -192,7 +192,7 @@ func (c *Checker) checkYouTube(ctx context.Context) CheckResult {
 			Status:    "unhealthy",
 			Message:   fmt.Sprintf("YouTube service check failed: %v", err),
 			Timestamp: time.Now().UTC(),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"error_type": errorType,
 				"latency_ms": time.Since(start).Milliseconds(),
 			},
@@ -208,7 +208,7 @@ func (c *Checker) checkYouTube(ctx context.Context) CheckResult {
 	return CheckResult{
 		Status:    status,
 		Timestamp: time.Now().UTC(),
-		Details: map[string]interface{}{
+		Details: map[string]any{
 			"latency_ms": latency,
 		},
 	}
@@ -238,7 +238,7 @@ func (c *Checker) checkNetwork(ctx context.Context) CheckResult {
 			Status:    "unhealthy",
 			Message:   fmt.Sprintf("Network check failed: %v", err),
 			Timestamp: time.Now().UTC(),
-			Details: map[string]interface{}{
+			Details: map[string]any{
 				"latency_ms": time.Since(start).Milliseconds(),
 			},
 		}
@@ -261,7 +261,7 @@ func (c *Checker) checkNetwork(ctx context.Context) CheckResult {
 		Status:    status,
 		Message:   message,
 		Timestamp: time.Now().UTC(),
-		Details: map[string]interface{}{
+		Details: map[string]any{
 			"status_code": resp.StatusCode,
 			"latency_ms":  latency,
 		},
