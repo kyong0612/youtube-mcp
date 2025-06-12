@@ -154,7 +154,9 @@ func (c *Checker) checkCache(ctx context.Context) CheckResult {
 	}
 
 	// Clean up
-	c.cache.Delete(ctx, testKey)
+	if err := c.cache.Delete(ctx, testKey); err != nil {
+		slog.Warn("Failed to delete test key from cache", "error", err)
+	}
 
 	// Get cache size
 	size := c.cache.Size(ctx)
@@ -243,7 +245,11 @@ func (c *Checker) checkNetwork(ctx context.Context) CheckResult {
 			},
 		}
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("Failed to close response body", "error", err)
+		}
+	}()
 
 	latency := time.Since(start).Milliseconds()
 	status := "healthy"

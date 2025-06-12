@@ -66,7 +66,6 @@ func (s *Server) HandleMCP(w http.ResponseWriter, r *http.Request) {
 	s.incrementRequestCount()
 
 	var response *models.MCPResponse
-	var err error
 
 	switch request.Method {
 	case models.MCPMethodInitialize:
@@ -87,15 +86,6 @@ func (s *Server) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		response = s.handleSetLoggingLevel(ctx, request)
 	default:
 		s.sendError(w, request.ID, models.MCPErrorCodeMethodNotFound, "Method not found", request.Method)
-		return
-	}
-
-	if err != nil {
-		s.logger.Error("Error handling MCP request",
-			slog.String("method", request.Method),
-			slog.Any("error", err),
-		)
-		s.sendError(w, request.ID, models.MCPErrorCodeInternalError, "Internal error", err.Error())
 		return
 	}
 
@@ -170,7 +160,7 @@ func (s *Server) handleCallTool(ctx context.Context, request models.MCPRequest) 
 	if err != nil {
 		return s.errorResponse(request.ID, models.MCPErrorCodeInvalidParams, fmt.Sprintf("Failed to marshal params: %v", err))
 	}
-	if err := json.Unmarshal(paramsBytes, &toolCall); err != nil {
+	if unmarshalErr := json.Unmarshal(paramsBytes, &toolCall); unmarshalErr != nil {
 		return s.errorResponse(request.ID, models.MCPErrorCodeInvalidParams, "Invalid tool call parameters")
 	}
 
