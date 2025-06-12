@@ -194,8 +194,8 @@ func TestFormatSRTTime(t *testing.T) {
 	s := &Service{}
 
 	tests := []struct {
-		expected string
 		seconds  float64
+		expected string
 	}{
 		{0, "00:00:00,000"},
 		{1.5, "00:00:01,500"},
@@ -216,8 +216,8 @@ func TestFormatVTTTime(t *testing.T) {
 	s := &Service{}
 
 	tests := []struct {
-		expected string
 		seconds  float64
+		expected string
 	}{
 		{0, "00:00:00.000"},
 		{1.5, "00:00:01.500"},

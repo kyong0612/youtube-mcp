@@ -70,8 +70,14 @@ func TestLoadWithEnvironmentVariables(t *testing.T) {
 
 	// Set environment variables
 	for key, value := range testEnvVars {
-		os.Setenv(key, value)
-		defer os.Unsetenv(key)
+		if err := os.Setenv(key, value); err != nil {
+			t.Fatalf("Failed to set env var %s: %v", key, err)
+		}
+		defer func() {
+			if err := os.Unsetenv(key); err != nil {
+				t.Errorf("Failed to unset env var %s: %v", key, err)
+			}
+		}()
 	}
 
 	cfg, err := Load()
@@ -220,7 +226,9 @@ func TestConfigValidation(t *testing.T) {
 
 func TestGetEnvHelpers(t *testing.T) {
 	// Test getEnvString
-	os.Setenv("TEST_STRING", "hello")
+	if err := os.Setenv("TEST_STRING", "hello"); err != nil {
+		t.Fatalf("Failed to set TEST_STRING: %v", err)
+	}
 	defer os.Unsetenv("TEST_STRING")
 	if v := getEnvString("TEST_STRING", "default"); v != "hello" {
 		t.Errorf("Expected 'hello', got '%s'", v)
