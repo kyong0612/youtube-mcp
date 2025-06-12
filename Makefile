@@ -4,7 +4,7 @@
 APP_NAME = youtube-transcript-mcp
 DOCKER_IMAGE = $(APP_NAME):latest
 DOCKER_CONTAINER = $(APP_NAME)
-GO_VERSION = 1.22
+GO_VERSION = 1.24.0
 
 # Build variables
 VERSION ?= 1.0.0

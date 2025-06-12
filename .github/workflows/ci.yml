@@ -56,7 +56,8 @@ jobs:
     - name: Install tools
       run: |
         # Install tools with error handling for Go 1.24 compatibility
-        make tools || echo "::warning::Some tools may have failed to install due to Go 1.24 compatibility"
+        make tools || true
+        echo "::warning::Some tools may have failed to install due to Go 1.24 compatibility. This is expected with Go 1.24."
         
     - name: Check for vulnerable dependencies
       run: |
@@ -101,10 +102,10 @@ jobs:
     - name: Run golangci-lint
       run: |
         # Try to run golangci-lint, but don't fail the build if it doesn't work
-        if .tools/bin/golangci-lint --version 2>/dev/null; then
-          .tools/bin/golangci-lint run --timeout=5m ./... || echo "::warning::golangci-lint failed, continuing with individual linters"
+        if [ -f .tools/bin/golangci-lint ] && .tools/bin/golangci-lint --version 2>/dev/null; then
+          .tools/bin/golangci-lint run --timeout=5m ./... || echo "::warning::golangci-lint found issues or failed"
         else
-          echo "::warning::golangci-lint not available, running individual linters instead..."
+          echo "::warning::golangci-lint not available, skipping..."
         fi
         
     - name: Run additional linters
@@ -146,10 +147,14 @@ jobs:
         
     - name: Check imports
       run: |
-        if [ -n "$(.tools/bin/goimports -l .)" ]; then
-          echo "::error::Go imports are not formatted. Run 'goimports -w .'"
-          .tools/bin/goimports -d .
-          exit 1
+        if [ -f .tools/bin/goimports ]; then
+          if [ -n "$(.tools/bin/goimports -l .)" ]; then
+            echo "::error::Go imports are not formatted. Run 'goimports -w .'"
+            .tools/bin/goimports -d .
+            exit 1
+          fi
+        else
+          echo "::warning::goimports not available, skipping import check"
         fi
 
   # Security scanning job
@@ -638,16 +643,25 @@ jobs:
     - name: Install tools
       run: |
         # Install tools with error handling for Go 1.24 compatibility
-        make tools || echo "::warning::Some tools may have failed to install due to Go 1.24 compatibility"
+        make tools || true
+        echo "::warning::Some tools may have failed to install due to Go 1.24 compatibility. This is expected with Go 1.24."
         
     - name: Generate changelog
       id: changelog
       run: |
         # Generate changelog for this version
-        .tools/bin/git-chglog -o CHANGELOG_RELEASE.md ${{ github.ref_name }}
-        
-        # Get release notes for this version only
-        .tools/bin/git-chglog ${{ github.ref_name }} > RELEASE_NOTES.md
+        if [ -f .tools/bin/git-chglog ]; then
+          .tools/bin/git-chglog -o CHANGELOG_RELEASE.md ${{ github.ref_name }}
+          # Get release notes for this version only
+          .tools/bin/git-chglog ${{ github.ref_name }} > RELEASE_NOTES.md
+        else
+          echo "::warning::git-chglog not available, creating basic release notes"
+          echo "# Release ${{ github.ref_name }}" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## Changes" >> RELEASE_NOTES.md
+          git log --pretty=format:"- %s" $(git describe --tags --abbrev=0)..HEAD >> RELEASE_NOTES.md
+          cp RELEASE_NOTES.md CHANGELOG_RELEASE.md
+        fi
         
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2

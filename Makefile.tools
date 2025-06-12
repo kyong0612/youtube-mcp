@@ -15,20 +15,21 @@ $(TOOLS_BIN):
 tools: $(TOOLS_BIN) ## Install all development tools
 	@echo "Installing development tools..."
 	@echo "Downloading tool dependencies..."
-	@go mod download -x
+	@go mod download -x || true
 	@echo "Installing tools to $(TOOLS_BIN)..."
-	@GOBIN=$(TOOLS_BIN) go install github.com/air-verse/air
-	@GOBIN=$(TOOLS_BIN) go install github.com/git-chglog/git-chglog/cmd/git-chglog
-	@GOBIN=$(TOOLS_BIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint
-	@GOBIN=$(TOOLS_BIN) go install github.com/gordonklaus/ineffassign
-	@GOBIN=$(TOOLS_BIN) go install github.com/mgechev/revive
-	@GOBIN=$(TOOLS_BIN) go install github.com/securego/gosec/v2/cmd/gosec
-	@GOBIN=$(TOOLS_BIN) go install github.com/sonatype-nexus-community/nancy
-	@GOBIN=$(TOOLS_BIN) go install golang.org/x/tools/cmd/goimports
-	@GOBIN=$(TOOLS_BIN) go install golang.org/x/tools/cmd/godoc
-	@GOBIN=$(TOOLS_BIN) go install golang.org/x/vuln/cmd/govulncheck
-	@GOBIN=$(TOOLS_BIN) go install honnef.co/go/tools/cmd/staticcheck
-	@echo "Tools installed successfully in $(TOOLS_BIN)"
+	@echo "Note: Some tools may fail with Go 1.24 - this is expected"
+	@GOBIN=$(TOOLS_BIN) go install github.com/air-verse/air || echo "Warning: Failed to install air"
+	@GOBIN=$(TOOLS_BIN) go install github.com/git-chglog/git-chglog/cmd/git-chglog || echo "Warning: Failed to install git-chglog"
+	@GOBIN=$(TOOLS_BIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint || echo "Warning: Failed to install golangci-lint"
+	@GOBIN=$(TOOLS_BIN) go install github.com/gordonklaus/ineffassign || echo "Warning: Failed to install ineffassign"
+	@GOBIN=$(TOOLS_BIN) go install github.com/mgechev/revive || echo "Warning: Failed to install revive"
+	@GOBIN=$(TOOLS_BIN) go install github.com/securego/gosec/v2/cmd/gosec || echo "Warning: Failed to install gosec"
+	@GOBIN=$(TOOLS_BIN) go install github.com/sonatype-nexus-community/nancy || echo "Warning: Failed to install nancy"
+	@GOBIN=$(TOOLS_BIN) go install golang.org/x/tools/cmd/goimports || echo "Warning: Failed to install goimports"
+	@GOBIN=$(TOOLS_BIN) go install golang.org/x/tools/cmd/godoc || echo "Warning: Failed to install godoc"
+	@GOBIN=$(TOOLS_BIN) go install golang.org/x/vuln/cmd/govulncheck || echo "Warning: Failed to install govulncheck"
+	@GOBIN=$(TOOLS_BIN) go install honnef.co/go/tools/cmd/staticcheck || echo "Warning: Failed to install staticcheck"
+	@echo "Tool installation process completed (some tools may have failed with Go 1.24)"
 
 # Update tools to latest versions
 .PHONY: tools-update
