@@ -61,7 +61,11 @@ func main() {
 
 	// Create cache instance
 	cacheInstance := setupCache(cfg.Cache, logger)
-	defer cacheInstance.Close()
+	defer func() {
+		if err := cacheInstance.Close(); err != nil {
+			logger.Error("Failed to close cache", "error", err)
+		}
+	}()
 
 	// Initialize YouTube service
 	youtubeService := youtube.NewService(cfg.YouTube, cacheInstance, logger)
@@ -268,7 +272,11 @@ func setupHTTPServer(cfg *config.Config, mcpServer *mcp.Server, logger *slog.Log
 		// Stats endpoint
 		r.Get("/stats", func(w http.ResponseWriter, r *http.Request) {
 			stats := mcpServer.GetStats()
-			json.NewEncoder(w).Encode(stats)
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(stats); err != nil {
+				logger.Error("Failed to encode stats", "error", err)
+				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			}
 		})
 	})
 
@@ -276,10 +284,12 @@ func setupHTTPServer(cfg *config.Config, mcpServer *mcp.Server, logger *slog.Log
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{
+		if err := json.NewEncoder(w).Encode(map[string]string{
 			"error": "Not found",
 			"path":  r.URL.Path,
-		})
+		}); err != nil {
+			logger.Error("Failed to encode 404 response", "error", err)
+		}
 	})
 
 	return &http.Server{
@@ -410,9 +420,11 @@ func rateLimitMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Hand
 				mu.Unlock()
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusTooManyRequests)
-				json.NewEncoder(w).Encode(map[string]string{
+				if err := json.NewEncoder(w).Encode(map[string]string{
 					"error": "Rate limit exceeded",
-				})
+				}); err != nil {
+					logger.Error("Failed to encode rate limit response", "error", err)
+				}
 				return
 			}
 
@@ -443,9 +455,11 @@ func authMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Handler {
 			if apiKey == "" {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
-				json.NewEncoder(w).Encode(map[string]string{
+				if err := json.NewEncoder(w).Encode(map[string]string{
 					"error": "Missing API key",
-				})
+				}); err != nil {
+					logger.Error("Failed to encode auth error response", "error", err)
+				}
 				return
 			}
 
@@ -461,9 +475,11 @@ func authMiddleware(cfg config.SecurityConfig) func(http.Handler) http.Handler {
 			if !valid {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
-				json.NewEncoder(w).Encode(map[string]string{
+				if err := json.NewEncoder(w).Encode(map[string]string{
 					"error": "Invalid API key",
-				})
+				}); err != nil {
+					logger.Error("Failed to encode auth error response", "error", err)
+				}
 				return
 			}
 
@@ -494,7 +510,10 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(healthStatus)
+	if err := json.NewEncoder(w).Encode(healthStatus); err != nil {
+		logger.Error("Failed to encode health status", "error", err)
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 func handleReady(w http.ResponseWriter, r *http.Request) {
@@ -516,7 +535,10 @@ func handleReady(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("Failed to encode response", "error", err)
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 func handleVersion(w http.ResponseWriter, r *http.Request) {
@@ -530,7 +552,10 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("Failed to encode response", "error", err)
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 func handleOptions(w http.ResponseWriter, r *http.Request) {
@@ -545,13 +570,22 @@ func startMetricsServer(cfg config.MetricsConfig, mcpServer *mcp.Server, logger 
 	mux.HandleFunc(cfg.Path, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		// Prometheus metrics would be exposed here
-		fmt.Fprintf(w, "# YouTube Transcript MCP Server Metrics\n")
-		fmt.Fprintf(w, "# TODO: Implement Prometheus metrics\n")
+		if _, err := fmt.Fprintf(w, "# YouTube Transcript MCP Server Metrics\n"); err != nil {
+			logger.Error("Failed to write metrics header", "error", err)
+			return
+		}
+		if _, err := fmt.Fprintf(w, "# TODO: Implement Prometheus metrics\n"); err != nil {
+			logger.Error("Failed to write metrics TODO", "error", err)
+			return
+		}
 
 		// For now, return basic stats
 		stats := mcpServer.GetStats()
 		for key, value := range stats {
-			fmt.Fprintf(w, "youtube_transcript_mcp_%s %v\n", key, value)
+			if _, err := fmt.Fprintf(w, "youtube_transcript_mcp_%s %v\n", key, value); err != nil {
+				logger.Error("Failed to write metric", "error", err, "key", key)
+				return
+			}
 		}
 	})
 

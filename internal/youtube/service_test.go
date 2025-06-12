@@ -403,8 +403,8 @@ func TestFormatAsSRT(t *testing.T) {
 	s := &Service{}
 
 	segments := []models.TranscriptSegment{
-		{Text: "Hello", Start: 0, Duration: 2, End: 2},
-		{Text: "world", Start: 2, Duration: 3, End: 5},
+		{Text: "Hello", Start: 0.0, Duration: 2.0, End: 2.0},
+		{Text: "world", Start: 2.0, Duration: 3.0, End: 5.0},
 	}
 
 	result := s.formatAsSRT(segments)
@@ -425,8 +425,8 @@ func TestFormatAsVTT(t *testing.T) {
 	s := &Service{}
 
 	segments := []models.TranscriptSegment{
-		{Text: "Hello", Start: 0, Duration: 2, End: 2},
-		{Text: "world", Start: 2, Duration: 3, End: 5},
+		{Text: "Hello", Start: 0.0, Duration: 2.0, End: 2.0},
+		{Text: "world", Start: 2.0, Duration: 3.0, End: 5.0},
 	}
 
 	result := s.formatAsVTT(segments)
