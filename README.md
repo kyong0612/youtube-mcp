@@ -24,7 +24,9 @@ A high-performance Model Context Protocol (MCP) server for fetching YouTube vide
 - Docker & Docker Compose (optional)
 - Internet connection
 
-## 🎯 MCP Client Setup (Claude Desktop)
+## 🎯 MCP Client Setup
+
+### Claude Desktop
 
 To use this server with Claude Desktop, add to your `claude_desktop_config.json`:
 
@@ -39,6 +41,85 @@ To use this server with Claude Desktop, add to your `claude_desktop_config.json`
         "LOG_LEVEL": "info",
         "CACHE_ENABLED": "true",
         "YOUTUBE_DEFAULT_LANGUAGES": "en,ja"
+      }
+    }
+  }
+}
+```
+
+### Claude Code (claude.ai/code)
+
+Claude Code automatically detects MCP servers. To configure:
+
+1. **Using Go runtime:**
+```json
+{
+  "mcpServers": {
+    "youtube-transcript": {
+      "command": "go",
+      "args": ["run", "/path/to/youtube-mcp/cmd/server/main.go"],
+      "env": {
+        "LOG_LEVEL": "info",
+        "CACHE_ENABLED": "true"
+      }
+    }
+  }
+}
+```
+
+2. **Using compiled binary:**
+```bash
+# First, build the binary
+cd /path/to/youtube-mcp
+make build
+
+# Then add to Claude Code config
+```
+```json
+{
+  "mcpServers": {
+    "youtube-transcript": {
+      "command": "/path/to/youtube-mcp/youtube-transcript-mcp",
+      "env": {
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+### Cursor
+
+Cursor supports MCP servers through its settings. To configure:
+
+1. Open Cursor Settings (`Cmd+,` on macOS, `Ctrl+,` on Windows/Linux)
+2. Search for "MCP" or "Model Context Protocol"
+3. Add the server configuration:
+
+```json
+{
+  "mcp.servers": {
+    "youtube-transcript": {
+      "command": "go",
+      "args": ["run", "/path/to/youtube-mcp/cmd/server/main.go"],
+      "env": {
+        "LOG_LEVEL": "info",
+        "CACHE_ENABLED": "true",
+        "YOUTUBE_DEFAULT_LANGUAGES": "en,ja"
+      }
+    }
+  }
+}
+```
+
+Or use the compiled binary:
+```json
+{
+  "mcp.servers": {
+    "youtube-transcript": {
+      "command": "/path/to/youtube-mcp/youtube-transcript-mcp",
+      "env": {
+        "LOG_LEVEL": "info"
       }
     }
   }

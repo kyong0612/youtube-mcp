@@ -1,6 +1,6 @@
 # MCP Client Setup Guide
 
-このドキュメントでは、YouTube Transcript MCP ServerをClaude DesktopなどのMCPクライアントから使用する方法を説明します。
+このドキュメントでは、YouTube Transcript MCP ServerをClaude Desktop、Claude Code、CursorなどのMCPクライアントから使用する方法を説明します。
 
 ## Claude Desktop での設定
 
@@ -125,9 +125,111 @@ make build
 }
 ```
 
+## Claude Code での設定
+
+Claude Code（claude.ai/code）はMCPサーバーを自動的に検出します。
+
+### 1. 設定方法
+
+#### 方法1: Go実行環境を使用
+
+```json
+{
+  "mcpServers": {
+    "youtube-transcript": {
+      "command": "go",
+      "args": ["run", "/path/to/youtube-mcp/cmd/server/main.go"],
+      "env": {
+        "LOG_LEVEL": "info",
+        "CACHE_ENABLED": "true",
+        "YOUTUBE_DEFAULT_LANGUAGES": "en,ja"
+      }
+    }
+  }
+}
+```
+
+#### 方法2: コンパイル済みバイナリを使用
+
+```bash
+# まずバイナリをビルド
+cd /path/to/youtube-mcp
+make build
+```
+
+```json
+{
+  "mcpServers": {
+    "youtube-transcript": {
+      "command": "/path/to/youtube-mcp/youtube-transcript-mcp",
+      "env": {
+        "LOG_LEVEL": "info",
+        "CACHE_ENABLED": "true"
+      }
+    }
+  }
+}
+```
+
+### 2. Claude Codeの特徴
+
+- MCPサーバーの自動検出と統合
+- リアルタイムでの字幕取得と処理
+- 複数の動画を並行処理可能
+
+## Cursor での設定
+
+CursorはMCPサーバーをサポートしています。
+
+### 1. 設定方法
+
+1. Cursorの設定を開く（macOS: `Cmd+,`、Windows/Linux: `Ctrl+,`）
+2. "MCP"または"Model Context Protocol"を検索
+3. 以下の設定を追加：
+
+#### Go実行環境を使用する場合
+
+```json
+{
+  "mcp.servers": {
+    "youtube-transcript": {
+      "command": "go",
+      "args": ["run", "/path/to/youtube-mcp/cmd/server/main.go"],
+      "env": {
+        "LOG_LEVEL": "info",
+        "CACHE_ENABLED": "true",
+        "YOUTUBE_DEFAULT_LANGUAGES": "en,ja"
+      }
+    }
+  }
+}
+```
+
+#### コンパイル済みバイナリを使用する場合
+
+```json
+{
+  "mcp.servers": {
+    "youtube-transcript": {
+      "command": "/path/to/youtube-mcp/youtube-transcript-mcp",
+      "env": {
+        "LOG_LEVEL": "info",
+        "CACHE_ENABLED": "true"
+      }
+    }
+  }
+}
+```
+
+### 2. Cursorでの活用例
+
+- コードコメントに動画の内容を自動追加
+- チュートリアル動画からコードスニペットを抽出
+- 技術解説動画の要約をドキュメントに反映
+
 ## 使用方法
 
-Claude Desktopを再起動後、以下のツールが利用可能になります：
+MCPクライアント（Claude Desktop、Claude Code、Cursor）を再起動後、以下のツールが利用可能になります：
 
 ### 1. 動画の字幕を取得
 
