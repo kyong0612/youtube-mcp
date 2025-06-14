@@ -915,3 +915,74 @@ func (s *Server) getEnabledToolCount() int {
 	}
 	return count
 }
+
+// HandleRawMessage handles raw JSON-RPC messages for stdio mode
+func (s *Server) HandleRawMessage(ctx context.Context, message []byte) (interface{}, error) {
+	var request models.MCPRequest
+	if err := json.Unmarshal(message, &request); err != nil {
+		// Parse error response should not include ID
+		return map[string]interface{}{
+			"jsonrpc": "2.0",
+			"error": map[string]interface{}{
+				"code":    models.MCPErrorCodeParseError,
+				"message": "Parse error",
+				"data":    err.Error(),
+			},
+		}, nil
+	}
+
+	// Check if this is a notification (no ID)
+	if request.ID == nil {
+		// Process notification but don't return response
+		s.logger.Debug("Received notification",
+			slog.String("method", request.Method),
+		)
+		
+		// Handle known notifications
+		switch request.Method {
+		case "notifications/initialized":
+			// Client has completed initialization
+			s.logger.Debug("Client initialized")
+		default:
+			// Unknown notification, just log it
+			s.logger.Debug("Unknown notification", slog.String("method", request.Method))
+		}
+		
+		// Notifications don't get responses
+		return nil, nil
+	}
+
+	// Log request
+	s.logger.Debug("Received MCP request",
+		slog.String("method", request.Method),
+		slog.Any("id", request.ID),
+	)
+
+	// Increment request count
+	s.incrementRequestCount()
+
+	var response *models.MCPResponse
+
+	switch request.Method {
+	case models.MCPMethodInitialize:
+		response = s.handleInitialize(ctx, request)
+	case models.MCPMethodListTools:
+		response = s.handleListTools(ctx, request)
+	case models.MCPMethodCallTool:
+		response = s.handleCallTool(ctx, request)
+	case models.MCPMethodListResources:
+		response = s.handleListResources(ctx, request)
+	case models.MCPMethodReadResource:
+		response = s.handleReadResource(ctx, request)
+	case models.MCPMethodListPrompts:
+		response = s.handleListPrompts(ctx, request)
+	case models.MCPMethodGetPrompt:
+		response = s.handleGetPrompt(ctx, request)
+	case models.MCPMethodSetLoggingLevel:
+		response = s.handleSetLoggingLevel(ctx, request)
+	default:
+		return s.errorResponse(request.ID, models.MCPErrorCodeMethodNotFound, "Method not found"), nil
+	}
+
+	return response, nil
+}

@@ -53,14 +53,25 @@ type ProxyManager struct {
 
 // NewService creates a new YouTube service instance
 func NewService(cfg config.YouTubeConfig, cache cache.Cache, logger *slog.Logger) *Service {
+	// Create HTTP client with custom transport
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  false,
+	}
+
 	httpClient := &http.Client{
-		Timeout: cfg.RequestTimeout,
+		Timeout:   cfg.RequestTimeout,
+		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return fmt.Errorf("too many redirects")
 			}
 			return nil
 		},
+		// Cookie jar for handling consent cookies
+		Jar: http.DefaultClient.Jar,
 	}
 
 	// Configure proxy if enabled
@@ -69,17 +80,13 @@ func NewService(cfg config.YouTubeConfig, cache cache.Cache, logger *slog.Logger
 		proxyManager = &ProxyManager{
 			proxies: cfg.ProxyList,
 		}
-		httpClient.Transport = &http.Transport{
-			Proxy: proxyManager.GetProxy,
-		}
+		transport.Proxy = proxyManager.GetProxy
 	} else if cfg.ProxyURL != "" {
 		proxyURL, err := url.Parse(cfg.ProxyURL)
 		if err != nil {
 			logger.Error("Failed to parse proxy URL", "error", err, "proxy", cfg.ProxyURL)
 		} else {
-			httpClient.Transport = &http.Transport{
-				Proxy: http.ProxyURL(proxyURL),
-			}
+			transport.Proxy = http.ProxyURL(proxyURL)
 		}
 	}
 
@@ -435,8 +442,14 @@ func (s *Service) fetchVideoData(ctx context.Context, videoID string) (*VideoDat
 		return nil, err
 	}
 
+	// Set headers similar to youtube-transcript-api
 	req.Header.Set("User-Agent", s.config.UserAgent)
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+	req.Header.Set("Accept-Encoding", "gzip, deflate")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
 
 	resp, err := s.doHTTPRequestWithRetry(ctx, req)
 	if err != nil {
@@ -473,8 +486,17 @@ func (s *Service) fetchVideoData(ctx context.Context, videoID string) (*VideoDat
 		return nil, err
 	}
 
+	html := string(body)
+
+	// Check if consent is required
+	if strings.Contains(html, `action="https://consent.youtube.com/s"`) {
+		// Handle consent page
+		s.logger.Debug("Consent page detected, attempting to handle")
+		// For now, we'll just proceed - in production, you'd want to handle this properly
+	}
+
 	// Extract video data from the page
-	return s.parseVideoData(string(body), videoID)
+	return s.parseVideoData(html, videoID)
 }
 
 // parseVideoData extracts video metadata and caption information from the HTML
@@ -602,7 +624,17 @@ func (s *Service) fetchTranscriptFromTrack(ctx context.Context, track *CaptionTr
 		return nil, err
 	}
 
+	// Set headers to mimic browser request
 	req.Header.Set("User-Agent", s.config.UserAgent)
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Encoding", "gzip, deflate")
+	req.Header.Set("Connection", "keep-alive")
+
+	s.logger.Debug("Fetching transcript from track",
+		"url", track.BaseURL,
+		"language", track.LanguageCode,
+		"track_name", track.Name.SimpleText)
 
 	resp, err := s.doHTTPRequestWithRetry(ctx, req)
 	if err != nil {
@@ -618,6 +650,10 @@ func (s *Service) fetchTranscriptFromTrack(ctx context.Context, track *CaptionTr
 	}()
 
 	if resp.StatusCode != http.StatusOK {
+		s.logger.Error("HTTP error fetching transcript",
+			"status_code", resp.StatusCode,
+			"url", track.BaseURL,
+			"headers", resp.Header)
 		return nil, &models.TranscriptError{
 			Type:    models.ErrorTypeNetworkError,
 			Message: fmt.Sprintf("HTTP error fetching transcript: %d", resp.StatusCode),
@@ -629,16 +665,23 @@ func (s *Service) fetchTranscriptFromTrack(ctx context.Context, track *CaptionTr
 		return nil, err
 	}
 
+	// Check if body is empty
+	if len(body) == 0 {
+		s.logger.Error("Empty transcript response",
+			"url", track.BaseURL,
+			"status_code", resp.StatusCode)
+		return nil, fmt.Errorf("empty transcript response")
+	}
+
 	// Debug: Log the response size and first part
+	preview := string(body)
+	if len(preview) > 200 {
+		preview = preview[:200]
+	}
 	s.logger.Debug("Fetched transcript data",
 		"size", len(body),
 		"url", track.BaseURL,
-		"preview", string(body[:min(200, len(body))]))
-
-	// Check if body is empty
-	if len(body) == 0 {
-		return nil, fmt.Errorf("empty transcript response")
-	}
+		"preview", preview)
 
 	// Parse the transcript XML
 	return s.parseTranscriptXML(body)
@@ -740,8 +783,12 @@ func (s *Service) parseTranscriptXML(data []byte) ([]models.TranscriptSegment, e
 			}
 		} else {
 			// Log the XML content for debugging
+			xmlPreview := cleanData
+			if len(xmlPreview) > 500 {
+				xmlPreview = xmlPreview[:500]
+			}
 			s.logger.Error("Failed to parse XML in any known format",
-				"xml_preview", cleanData[:min(500, len(cleanData))],
+				"xml_preview", xmlPreview,
 				"parse_error", err)
 			return nil, fmt.Errorf("failed to parse transcript XML: unknown format or corrupted data")
 		}
