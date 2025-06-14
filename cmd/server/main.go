@@ -68,14 +68,15 @@ func main() {
 		}
 	}()
 
-	// Initialize YouTube service
-	youtubeService := youtube.NewService(cfg.YouTube, cacheInstance, logger)
+	// Initialize YouTube service with fallback support
+	baseService := youtube.NewService(cfg.YouTube, cacheInstance, logger)
+	youtubeService := youtube.NewEnhancedService(baseService)
 
 	// Initialize MCP server
 	mcpServer := mcp.NewServer(youtubeService, cfg.MCP, logger)
 
 	// Initialize health checker
-	healthChecker := health.NewChecker(cacheInstance, youtubeService)
+	healthChecker := health.NewChecker(cacheInstance, youtubeService.Service)
 
 	// Setup HTTP server
 	srv := setupHTTPServer(cfg, mcpServer, logger)

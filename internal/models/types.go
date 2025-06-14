@@ -94,7 +94,7 @@ type AvailableLanguagesResponse struct {
 
 // MCPRequest represents a Model Context Protocol request
 type MCPRequest struct {
-	ID      any    `json:"id"`
+	ID      any    `json:"id,omitempty"`
 	Params  any    `json:"params,omitempty"`
 	JSONRPC string `json:"jsonrpc"`
 	Method  string `json:"method"`
@@ -102,7 +102,7 @@ type MCPRequest struct {
 
 // MCPResponse represents a Model Context Protocol response
 type MCPResponse struct {
-	ID      any       `json:"id"`
+	ID      any       `json:"id,omitempty"`
 	Result  any       `json:"result,omitempty"`
 	Error   *MCPError `json:"error,omitempty"`
 	JSONRPC string    `json:"jsonrpc"`
