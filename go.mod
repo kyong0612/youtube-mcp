@@ -9,7 +9,7 @@ require (
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/kkdai/youtube/v2 v2.10.4
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/time v0.11.0
+	golang.org/x/time v0.12.0
 )
 
 tool github.com/air-verse/air
