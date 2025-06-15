@@ -21,9 +21,8 @@ Claude Desktopの設定ファイルは以下の場所にあります：
   "mcpServers": {
     "youtube-transcript": {
       "command": "go",
-      "args": ["run", "/path/to/youtube-mcp/cmd/server/main.go"],
+      "args": ["run", "/path/to/youtube-mcp/cmd/mcp/main.go"],
       "env": {
-        "PORT": "8080",
         "LOG_LEVEL": "info",
         "CACHE_ENABLED": "true",
         "YOUTUBE_DEFAULT_LANGUAGES": "en,ja,es,fr,de"
@@ -33,13 +32,15 @@ Claude Desktopの設定ファイルは以下の場所にあります：
 }
 ```
 
+**注意**: Claude DesktopにはSTDIOモードのMCPサーバー（`cmd/mcp/main.go`）が必要です。HTTPサーバー（`cmd/server/main.go`）ではありません。
+
 #### 方法2: ビルド済みバイナリを使用する場合
 
-まず、バイナリをビルドします：
+まず、STDIOモード用のバイナリをビルドします：
 
 ```bash
 cd /path/to/youtube-mcp
-make build
+go build -o youtube-mcp-stdio ./cmd/mcp/
 ```
 
 その後、設定ファイルに追加：
@@ -48,9 +49,8 @@ make build
 {
   "mcpServers": {
     "youtube-transcript": {
-      "command": "/path/to/youtube-mcp/youtube-transcript-mcp",
+      "command": "/path/to/youtube-mcp/youtube-mcp-stdio",
       "env": {
-        "PORT": "8080",
         "LOG_LEVEL": "info",
         "CACHE_ENABLED": "true",
         "YOUTUBE_DEFAULT_LANGUAGES": "en,ja"
@@ -138,7 +138,7 @@ Claude Code（claude.ai/code）はMCPサーバーを自動的に検出します�
   "mcpServers": {
     "youtube-transcript": {
       "command": "go",
-      "args": ["run", "/path/to/youtube-mcp/cmd/server/main.go"],
+      "args": ["run", "/path/to/youtube-mcp/cmd/mcp/main.go"],
       "env": {
         "LOG_LEVEL": "info",
         "CACHE_ENABLED": "true",

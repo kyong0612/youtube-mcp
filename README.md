@@ -20,7 +20,7 @@ A high-performance Model Context Protocol (MCP) server for fetching YouTube vide
 
 ## 📋 Requirements
 
-- Go 1.22 or higher
+- Go 1.24 or higher
 - Docker & Docker Compose (optional)
 - Internet connection
 
@@ -32,8 +32,8 @@ Use the automatic installation script:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/youtube-transcript-mcp.git
-cd youtube-transcript-mcp
+git clone https://github.com/kyong0612/youtube-mcp.git
+cd youtube-mcp
 
 # Run the installer
 ./scripts/install-mcp.sh
@@ -70,7 +70,7 @@ To use this server with Claude Desktop, add to your `claude_desktop_config.json`
 
 Build the stdio server:
 ```bash
-go build -o youtube-mcp-stdio ./cmd/mcp/main.go
+go build -o youtube-mcp-stdio ./cmd/mcp/
 ```
 
 #### Claude Code (claude.ai/code)
@@ -109,8 +109,8 @@ See [docs/mcp-client-setup.md](docs/mcp-client-setup.md) for detailed setup inst
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/youtube-transcript-mcp.git
-cd youtube-transcript-mcp
+git clone https://github.com/kyong0612/youtube-mcp.git
+cd youtube-mcp
 
 # Install dependencies
 make deps
@@ -126,8 +126,8 @@ make run
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/youtube-transcript-mcp.git
-cd youtube-transcript-mcp
+git clone https://github.com/kyong0612/youtube-mcp.git
+cd youtube-mcp
 
 # Setup environment
 make env-setup
@@ -155,7 +155,20 @@ Key configuration options:
 
 ## 🔧 Usage
 
-### Initialize MCP
+### Using with MCP Clients (Claude Desktop, Cursor, etc.)
+
+The MCP server will be automatically started by your MCP client. Once configured, you can use the tools directly in your conversations.
+
+### Using as HTTP Server
+
+For development or testing, you can also run the HTTP server version:
+
+```bash
+# Run HTTP server
+make run
+```
+
+Then test with:
 
 ```bash
 curl -X POST http://localhost:8080/mcp \
