@@ -3,7 +3,7 @@
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Go 1.23+
+- Go 1.24+
 - Docker & Docker Compose
 - Make (optional)
 
@@ -11,8 +11,8 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/youtube-transcript-mcp
-cd youtube-transcript-mcp
+git clone https://github.com/kyong0612/youtube-mcp
+cd youtube-mcp
 
 # Install dependencies
 go mod download
@@ -43,11 +43,14 @@ docker compose up -d
 ## 🏗️ Project Structure
 
 ```
-youtube-transcript-mcp/
+youtube-mcp/
 ├── cmd/
-│   └── server/
-│       ├── main.go          # Application entry point
-│       └── main_test.go     # Integration tests
+│   ├── server/
+│   │   ├── main.go          # HTTP server entry point
+│   │   └── README.md        # HTTP server documentation
+│   └── mcp/
+│       ├── main.go          # STDIO MCP server for Claude Desktop
+│       └── README.md        # STDIO server documentation
 ├── internal/
 │   ├── cache/
 │   │   ├── interface.go     # Cache interface
