@@ -51,8 +51,8 @@ make security
 # Run Go vet for static analysis
 make vet
 
-# Run all checks (fmt, lint, test)
-make check
+# Run all tests
+make test
 
 # Check for outdated dependencies
 make mod-check
@@ -136,8 +136,9 @@ make status
 
 1. **Entry Point Layer** (`cmd/server/main.go`)
    - Configuration loading and dependency injection
-   - Middleware pipeline setup (request ID, logging, rate limiting, CORS, auth, compression)
+   - Middleware pipeline setup: RequestID, RealIP, Recoverer, Timeout, Logging, Metrics, CORS (optional), Compression (optional), Rate limiting (optional), Auth (optional)
    - Graceful shutdown handling
+   - EnhancedService wrapper for YouTube service
 
 2. **Protocol Layer** (`internal/mcp/server.go`)
    - JSON-RPC 2.0 protocol implementation
@@ -152,9 +153,10 @@ make status
    - Concurrent request processing
 
 4. **Infrastructure Layer**
-   - Cache abstraction with size/memory limits
+   - Cache abstraction with size/memory limits (memory cache implemented, Redis configuration available)
    - Parallel health checking system
    - Configuration management with environment variables
+   - Chi router for HTTP routing
 
 ### MCP Protocol Implementation
 
@@ -214,7 +216,7 @@ Some videos return zero or missing duration values. The code handles this but ti
 - Mock interfaces for external dependencies (cache, HTTP client)
 - Table-driven tests for parsing functions
 - Test files are colocated with implementation
-- Coverage target: 80%+ (currently at 92.1%)
+- Coverage target: 80%+
 
 ### Integration Testing
 
@@ -246,6 +248,8 @@ pkill -f "./server"
 4. **internal/config/config.go**: Configuration loading and defaults
 5. **internal/health/health.go**: Health check implementation
 6. **docker-compose.yml**: Three profiles (default, with-redis, monitoring)
+7. **Makefile**: Comprehensive build, test, and deployment commands
+8. **Makefile.tools**: Tool installation targets for development dependencies
 
 ## Environment Variables
 
@@ -253,23 +257,29 @@ Key variables that affect behavior:
 
 - `LOG_LEVEL`: Set to "debug" for detailed logging including HTTP responses
 - `YOUTUBE_DEFAULT_LANGUAGES`: Comma-separated language codes (e.g., "en,ja,es")
-- `CACHE_TYPE`: "memory" or "redis" (currently only memory is implemented)
+- `CACHE_TYPE`: "memory" or "redis" (memory is implemented, Redis has configuration support)
 - `SECURITY_ENABLE_AUTH`: Enables API key authentication
-- `YOUTUBE_USER_AGENT`: Custom user agent for YouTube requests
+- `USER_AGENT`: Custom user agent for YouTube requests (not YOUTUBE_USER_AGENT)
 - `CACHE_TRANSCRIPT_TTL`: How long to cache transcripts (default: 24h)
-- `METRICS_ENABLED`: Enable Prometheus metrics endpoint on port 9090
-- `YOUTUBE_RATE_LIMIT`: Requests per second limit (default: 10)
-- `YOUTUBE_PROXY_URLS`: Comma-separated proxy URLs for rotation
+- `METRICS_ENABLED`: Enable Prometheus metrics endpoint on port 9090 (currently returns TODO)
+- `YOUTUBE_RATE_LIMIT_PER_MINUTE`: Rate limit per minute (not YOUTUBE_RATE_LIMIT)
+- `YOUTUBE_RATE_LIMIT_PER_HOUR`: Rate limit per hour
+- `YOUTUBE_PROXY_LIST`: Comma-separated proxy URLs for rotation (not YOUTUBE_PROXY_URLS)
+- `SERVER_ENABLE_CORS`: Enable CORS middleware
+- `SERVER_ENABLE_GZIP`: Enable compression middleware
+- `SECURITY_ENABLE_RATE_LIMIT`: Enable rate limiting middleware
 
 ## Development Scripts
 
 ### install-mcp.sh
+
 Automatically installs the MCP server and updates Claude Desktop configuration. Supports both binary installation and Go runtime execution.
 
 ### verify-server.sh
+
 Comprehensive verification script that tests all MCP tools and health endpoints. Provides colored output and handles server lifecycle.
 
-# important-instruction-reminders
+## Important Instruction Reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
