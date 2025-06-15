@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kkdai/youtube/v2"
+
 	"github.com/youtube-transcript-mcp/internal/models"
 )
 
@@ -89,12 +90,6 @@ func (k *KkdaiFetcher) FetchTranscript(ctx context.Context, videoID string, lang
 			End:      float64(seg.StartMs+seg.Duration) / 1000.0,
 		}
 		segments = append(segments, segment)
-	}
-
-	// Get available languages
-	availableLanguages := make([]string, 0, len(video.CaptionTracks))
-	for _, track := range video.CaptionTracks {
-		availableLanguages = append(availableLanguages, track.LanguageCode)
 	}
 
 	// Build response

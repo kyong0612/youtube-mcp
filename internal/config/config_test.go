@@ -27,7 +27,7 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.YouTube.RetryAttempts != 3 {
 		t.Errorf("Expected 3 retry attempts, got %d", cfg.YouTube.RetryAttempts)
 	}
-	if cfg.YouTube.UserAgent != "YouTube-Transcript-MCP-Server/1.0.0" {
+	if cfg.YouTube.UserAgent != "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" {
 		t.Errorf("Unexpected user agent: %s", cfg.YouTube.UserAgent)
 	}
 

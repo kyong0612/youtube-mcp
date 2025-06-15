@@ -917,13 +917,13 @@ func (s *Server) getEnabledToolCount() int {
 }
 
 // HandleRawMessage handles raw JSON-RPC messages for stdio mode
-func (s *Server) HandleRawMessage(ctx context.Context, message []byte) (interface{}, error) {
+func (s *Server) HandleRawMessage(ctx context.Context, message []byte) (any, error) {
 	var request models.MCPRequest
 	if err := json.Unmarshal(message, &request); err != nil {
 		// Parse error response should not include ID
-		return map[string]interface{}{
+		return map[string]any{
 			"jsonrpc": "2.0",
-			"error": map[string]interface{}{
+			"error": map[string]any{
 				"code":    models.MCPErrorCodeParseError,
 				"message": "Parse error",
 				"data":    err.Error(),
@@ -937,7 +937,7 @@ func (s *Server) HandleRawMessage(ctx context.Context, message []byte) (interfac
 		s.logger.Debug("Received notification",
 			slog.String("method", request.Method),
 		)
-		
+
 		// Handle known notifications
 		switch request.Method {
 		case "notifications/initialized":
@@ -947,7 +947,7 @@ func (s *Server) HandleRawMessage(ctx context.Context, message []byte) (interfac
 			// Unknown notification, just log it
 			s.logger.Debug("Unknown notification", slog.String("method", request.Method))
 		}
-		
+
 		// Notifications don't get responses
 		return nil, nil
 	}

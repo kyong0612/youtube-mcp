@@ -106,13 +106,13 @@ func runStdioMode(mcpServer *mcp.Server, logger *slog.Logger) error {
 		logger.Debug("Received request", "data", string(line))
 
 		// Parse to check for ID
-		var rawRequest map[string]interface{}
+		var rawRequest map[string]any
 		if err := json.Unmarshal(line, &rawRequest); err != nil {
 			logger.Error("Failed to parse request", "error", err)
 			// Send parse error response without ID
-			errorResp := map[string]interface{}{
+			errorResp := map[string]any{
 				"jsonrpc": "2.0",
-				"error": map[string]interface{}{
+				"error": map[string]any{
 					"code":    -32700,
 					"message": "Parse error",
 					"data":    err.Error(),
@@ -129,9 +129,9 @@ func runStdioMode(mcpServer *mcp.Server, logger *slog.Logger) error {
 		if err != nil {
 			logger.Error("Failed to handle message", "error", err)
 			// Send error response with ID if available
-			errorResp := map[string]interface{}{
+			errorResp := map[string]any{
 				"jsonrpc": "2.0",
-				"error": map[string]interface{}{
+				"error": map[string]any{
 					"code":    -32603,
 					"message": "Internal error",
 					"data":    err.Error(),

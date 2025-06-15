@@ -42,14 +42,14 @@ func NewEnhancedService(service *Service) *EnhancedService {
 	// Create fetchers
 	defaultFetcher := NewDefaultFetcher(service)
 	kkdaiFetcher := NewKkdaiFetcher()
-	
+
 	// Create composite fetcher with fallback order
 	compositeFetcher := NewCompositeFetcher(
 		service.logger,
-		defaultFetcher,  // Try our implementation first
-		kkdaiFetcher,    // Fall back to kkdai library
+		defaultFetcher, // Try our implementation first
+		kkdaiFetcher,   // Fall back to kkdai library
 	)
-	
+
 	return &EnhancedService{
 		Service:          service,
 		compositeFetcher: compositeFetcher,

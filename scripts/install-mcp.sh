@@ -54,10 +54,10 @@ fi
 
 # Build binary if needed
 if [[ "$BUILD_BINARY" == true ]]; then
-    echo -e "${GREEN}Building binary...${NC}"
+    echo -e "${GREEN}Building MCP stdio server...${NC}"
     cd "$INSTALL_DIR"
-    make build
-    BINARY_PATH="$INSTALL_DIR/youtube-transcript-mcp"
+    go build -o youtube-mcp-stdio ./cmd/mcp/main.go
+    BINARY_PATH="$INSTALL_DIR/youtube-mcp-stdio"
 else
     BINARY_PATH=""
 fi
@@ -78,8 +78,8 @@ if [[ "$BUILD_BINARY" == true ]]; then
 {
   "youtube-transcript": {
     "command": "$BINARY_PATH",
+    "args": [],
     "env": {
-      "PORT": "8080",
       "LOG_LEVEL": "info",
       "CACHE_ENABLED": "true",
       "YOUTUBE_DEFAULT_LANGUAGES": "en,ja,es,fr,de"
@@ -93,9 +93,8 @@ else
 {
   "youtube-transcript": {
     "command": "go",
-    "args": ["run", "$INSTALL_DIR/cmd/server/main.go"],
+    "args": ["run", "$INSTALL_DIR/cmd/mcp/main.go"],
     "env": {
-      "PORT": "8080",
       "LOG_LEVEL": "info",
       "CACHE_ENABLED": "true",
       "YOUTUBE_DEFAULT_LANGUAGES": "en,ja,es,fr,de"

@@ -26,7 +26,27 @@ A high-performance Model Context Protocol (MCP) server for fetching YouTube vide
 
 ## 🎯 MCP Client Setup
 
-### Claude Desktop
+### Quick Install (Recommended)
+
+Use the automatic installation script:
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/youtube-transcript-mcp.git
+cd youtube-transcript-mcp
+
+# Run the installer
+./scripts/install-mcp.sh
+```
+
+The installer will:
+- Build the MCP server binary
+- Configure Claude Desktop automatically
+- Set up environment variables
+
+### Manual Setup
+
+#### Claude Desktop
 
 To use this server with Claude Desktop, add to your `claude_desktop_config.json`:
 
@@ -34,10 +54,9 @@ To use this server with Claude Desktop, add to your `claude_desktop_config.json`
 {
   "mcpServers": {
     "youtube-transcript": {
-      "command": "go",
-      "args": ["run", "/path/to/youtube-mcp/cmd/server/main.go"],
+      "command": "/path/to/youtube-mcp/youtube-mcp-stdio",
+      "args": [],
       "env": {
-        "PORT": "8080",
         "LOG_LEVEL": "info",
         "CACHE_ENABLED": "true",
         "YOUTUBE_DEFAULT_LANGUAGES": "en,ja"
@@ -47,48 +66,18 @@ To use this server with Claude Desktop, add to your `claude_desktop_config.json`
 }
 ```
 
-### Claude Code (claude.ai/code)
+**Important**: Claude Desktop requires the stdio version of the server (`youtube-mcp-stdio`), not the HTTP server.
 
-Claude Code automatically detects MCP servers. To configure:
-
-1. **Using Go runtime:**
-```json
-{
-  "mcpServers": {
-    "youtube-transcript": {
-      "command": "go",
-      "args": ["run", "/path/to/youtube-mcp/cmd/server/main.go"],
-      "env": {
-        "LOG_LEVEL": "info",
-        "CACHE_ENABLED": "true"
-      }
-    }
-  }
-}
-```
-
-2. **Using compiled binary:**
+Build the stdio server:
 ```bash
-# First, build the binary
-cd /path/to/youtube-mcp
-make build
-
-# Then add to Claude Code config
-```
-```json
-{
-  "mcpServers": {
-    "youtube-transcript": {
-      "command": "/path/to/youtube-mcp/youtube-transcript-mcp",
-      "env": {
-        "LOG_LEVEL": "info"
-      }
-    }
-  }
-}
+go build -o youtube-mcp-stdio ./cmd/mcp/main.go
 ```
 
-### Cursor
+#### Claude Code (claude.ai/code)
+
+Claude Code automatically detects MCP servers. Use the same configuration as Claude Desktop.
+
+#### Cursor
 
 Cursor supports MCP servers through its settings. To configure:
 
@@ -100,26 +89,12 @@ Cursor supports MCP servers through its settings. To configure:
 {
   "mcp.servers": {
     "youtube-transcript": {
-      "command": "go",
-      "args": ["run", "/path/to/youtube-mcp/cmd/server/main.go"],
+      "command": "/path/to/youtube-mcp/youtube-mcp-stdio",
+      "args": [],
       "env": {
         "LOG_LEVEL": "info",
         "CACHE_ENABLED": "true",
         "YOUTUBE_DEFAULT_LANGUAGES": "en,ja"
-      }
-    }
-  }
-}
-```
-
-Or use the compiled binary:
-```json
-{
-  "mcp.servers": {
-    "youtube-transcript": {
-      "command": "/path/to/youtube-mcp/youtube-transcript-mcp",
-      "env": {
-        "LOG_LEVEL": "info"
       }
     }
   }
@@ -329,6 +304,52 @@ curl http://localhost:8080/ready
 
 ```bash
 curl http://localhost:9090/metrics
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### "Empty transcript response" error
+- **Cause**: The server is running in HTTP mode instead of stdio mode
+- **Solution**: Ensure you're using `youtube-mcp-stdio` binary, not `youtube-transcript-mcp`
+
+#### "Request timed out" error
+- **Cause**: Claude Desktop timeout or server not responding
+- **Solution**: 
+  - Restart Claude Desktop
+  - Check server logs: `LOG_LEVEL=debug` in environment
+  - Verify network connectivity
+
+#### "Failed to extract player response" in health checks
+- **Cause**: YouTube page structure changes or rate limiting
+- **Solution**: This is usually temporary. The server will retry automatically.
+
+#### Server not connecting to Claude Desktop
+- **Cause**: Incorrect configuration or binary path
+- **Solution**:
+  1. Verify the binary exists: `ls -la /path/to/youtube-mcp-stdio`
+  2. Check Claude Desktop logs: Developer → Open logs
+  3. Ensure the config file is valid JSON
+
+### Debug Mode
+
+Enable debug logging to see detailed information:
+
+```json
+{
+  "mcpServers": {
+    "youtube-transcript": {
+      "command": "/path/to/youtube-mcp/youtube-mcp-stdio",
+      "args": [],
+      "env": {
+        "LOG_LEVEL": "debug",
+        "CACHE_ENABLED": "true",
+        "YOUTUBE_DEFAULT_LANGUAGES": "en,ja"
+      }
+    }
+  }
+}
 ```
 
 ## 🔒 Security
