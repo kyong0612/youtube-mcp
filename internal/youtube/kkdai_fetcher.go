@@ -7,7 +7,7 @@ import (
 
 	"github.com/kkdai/youtube/v2"
 
-	"github.com/youtube-transcript-mcp/internal/models"
+	"github.com/kyong0612/youtube-mcp/internal/models"
 )
 
 // KkdaiFetcher uses the kkdai/youtube library to fetch transcripts

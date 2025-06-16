@@ -3,7 +3,7 @@ package mcp
 import (
 	"context"
 
-	"github.com/youtube-transcript-mcp/internal/models"
+	"github.com/kyong0612/youtube-mcp/internal/models"
 )
 
 // YouTubeService defines the interface for YouTube transcript operations

@@ -12,8 +12,8 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"github.com/youtube-transcript-mcp/internal/config"
-	"github.com/youtube-transcript-mcp/internal/models"
+	"github.com/kyong0612/youtube-mcp/internal/config"
+	"github.com/kyong0612/youtube-mcp/internal/models"
 )
 
 // Server implements the MCP server

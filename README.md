@@ -44,6 +44,43 @@ The installer will:
 - Configure Claude Desktop automatically
 - Set up environment variables
 
+### Install via Go Install
+
+You can install the MCP server directly using `go install`:
+
+```bash
+# Install the stdio version for MCP clients
+go install github.com/kyong0612/youtube-mcp/cmd/mcp@latest
+
+# The binary will be installed to $GOPATH/bin/mcp
+# Rename it for clarity
+mv $GOPATH/bin/mcp $GOPATH/bin/youtube-mcp-stdio
+
+# Or install to a specific location
+GOBIN=/usr/local/bin go install github.com/kyong0612/youtube-mcp/cmd/mcp@latest
+sudo mv /usr/local/bin/mcp /usr/local/bin/youtube-mcp-stdio
+```
+
+Then configure your MCP client to use the installed binary:
+
+```json
+{
+  "mcpServers": {
+    "youtube-transcript": {
+      "command": "youtube-mcp-stdio",
+      "args": [],
+      "env": {
+        "LOG_LEVEL": "info",
+        "CACHE_ENABLED": "true",
+        "YOUTUBE_DEFAULT_LANGUAGES": "en,ja"
+      }
+    }
+  }
+}
+```
+
+**Note**: If you installed to `$GOPATH/bin`, make sure it's in your PATH, or use the full path in the command field.
+
 ### Manual Setup
 
 #### Claude Desktop

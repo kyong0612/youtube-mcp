@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/youtube-transcript-mcp/internal/models"
+	"github.com/kyong0612/youtube-mcp/internal/models"
 )
 
 func TestMemoryCache_SetAndGet(t *testing.T) {

@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/youtube-transcript-mcp/internal/config"
-	"github.com/youtube-transcript-mcp/internal/models"
+	"github.com/kyong0612/youtube-mcp/internal/config"
+	"github.com/kyong0612/youtube-mcp/internal/models"
 )
 
 // Mock cache for testing

@@ -5,6 +5,9 @@
 *.so
 *.dylib
 youtube-transcript-mcp
+youtube-mcp-stdio
+server
+mcp
 
 # Test binary, built with `go test -c`
 *.test

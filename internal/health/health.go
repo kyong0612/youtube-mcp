@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/youtube-transcript-mcp/internal/cache"
-	"github.com/youtube-transcript-mcp/internal/youtube"
+	"github.com/kyong0612/youtube-mcp/internal/cache"
+	"github.com/kyong0612/youtube-mcp/internal/youtube"
 )
 
 // Checker performs health checks on various system components

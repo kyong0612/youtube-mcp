@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/youtube-transcript-mcp/internal/models"
+	"github.com/kyong0612/youtube-mcp/internal/models"
 )
 
 // DefaultFetcher wraps the existing Service implementation as a TranscriptFetcher
