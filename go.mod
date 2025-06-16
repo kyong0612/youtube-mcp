@@ -1,4 +1,4 @@
-module github.com/youtube-transcript-mcp
+module github.com/kyong0612/youtube-mcp
 
 go 1.24
 
