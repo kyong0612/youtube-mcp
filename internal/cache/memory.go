@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/youtube-transcript-mcp/internal/models"
+	"github.com/kyong0612/youtube-mcp/internal/models"
 )
 
 // MemoryCache implements an in-memory cache

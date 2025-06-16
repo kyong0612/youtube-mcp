@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/youtube-transcript-mcp/internal/models"
+	"github.com/kyong0612/youtube-mcp/internal/models"
 )
 
 // TranscriptFetcher defines the interface for transcript fetchers

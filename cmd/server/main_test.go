@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/youtube-transcript-mcp/internal/models"
+	"github.com/kyong0612/youtube-mcp/internal/models"
 )
 
 func TestMain(m *testing.M) {

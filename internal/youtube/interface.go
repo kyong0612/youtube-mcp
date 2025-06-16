@@ -3,7 +3,7 @@ package youtube
 import (
 	"context"
 
-	"github.com/youtube-transcript-mcp/internal/models"
+	"github.com/kyong0612/youtube-mcp/internal/models"
 )
 
 // ServiceInterface defines the interface for YouTube transcript operations

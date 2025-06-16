@@ -11,10 +11,10 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/youtube-transcript-mcp/internal/cache"
-	"github.com/youtube-transcript-mcp/internal/config"
-	"github.com/youtube-transcript-mcp/internal/mcp"
-	"github.com/youtube-transcript-mcp/internal/youtube"
+	"github.com/kyong0612/youtube-mcp/internal/cache"
+	"github.com/kyong0612/youtube-mcp/internal/config"
+	"github.com/kyong0612/youtube-mcp/internal/mcp"
+	"github.com/kyong0612/youtube-mcp/internal/youtube"
 )
 
 // Version information (set during build)
