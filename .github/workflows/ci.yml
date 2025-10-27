@@ -146,7 +146,7 @@ jobs:
         ls -la youtube-mcp
         
     - name: Upload artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: youtube-mcp-linux-amd64
         path: youtube-mcp
