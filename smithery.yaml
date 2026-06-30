@@ -3,11 +3,28 @@
 # This server speaks the Model Context Protocol over stdio
 # (entry point: ./cmd/mcp, binary: youtube-mcp-stdio).
 #
-# Schema verified against the Smithery docs (https://smithery.ai/docs,
-# "Custom container" / project config) on 2026-06-30. The stdio form below
-# uses `startCommand.type: stdio` with a `commandFunction` that launches the
-# compiled stdio binary and maps the user-provided config to environment
-# variables consumed by internal/config/config.go.
+# SCHEMA NOTE (verified against the current Smithery docs via the context7 MCP
+# tool on 2026-06-30): the `startCommand.type: stdio` + `commandFunction` shape
+# below is the LEGACY Smithery deploy schema. The current docs document only
+# `runtime: "typescript"` and `runtime: "container"` (the latter with
+# `startCommand.type: "http"`), and Smithery discontinued HOSTED stdio
+# deployments (announced ~2025-09-07). This manifest is therefore appropriate
+# for a registry LISTING / local install of the stdio binary, but it will NOT
+# produce a working Smithery-hosted cloud deployment as-is.
+#
+# To make a hosted deploy work, cmd/server would first need to implement the
+# MCP Streamable HTTP transport (today it exposes only single-shot JSON-RPC
+# POST at /mcp, which is not Streamable HTTP), after which this file would move
+# to `runtime: container` + `startCommand.type: http` + a `build:` section.
+#
+# DOCKERFILE PREREQUISITE: the repo root Dockerfile builds ./cmd/server (binary
+# `youtube-transcript-mcp`, the HTTP server), NOT the stdio binary
+# `youtube-mcp-stdio`. The `commandFunction` below assumes `youtube-mcp-stdio`
+# has been built and is on PATH (e.g. `go build -o youtube-mcp-stdio ./cmd/mcp`);
+# the root Dockerfile alone does not provide it.
+#
+# The configSchema maps each field to an environment variable consumed by
+# internal/config/config.go (LOG_LEVEL, YOUTUBE_DEFAULT_LANGUAGES, CACHE_ENABLED).
 startCommand:
   type: stdio
   # JSON Schema describing the configuration users can supply when launching
