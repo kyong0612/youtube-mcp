@@ -3,7 +3,9 @@ package youtube
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -18,11 +20,13 @@ import (
 // Mock cache for testing
 type mockCache struct {
 	data map[string]any
+	ttls map[string]time.Duration
 }
 
 func newMockCache() *mockCache {
 	return &mockCache{
 		data: make(map[string]any),
+		ttls: make(map[string]time.Duration),
 	}
 }
 
@@ -33,6 +37,7 @@ func (m *mockCache) Get(ctx context.Context, key string) (any, bool) {
 
 func (m *mockCache) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
 	m.data[key] = value
+	m.ttls[key] = ttl
 	return nil
 }
 
@@ -498,7 +503,7 @@ func TestServiceWithCache(t *testing.T) {
 	mockCache := newMockCache()
 	logger := slog.Default()
 
-	service := NewService(cfg, mockCache, logger)
+	service := NewService(cfg, config.CacheConfig{}, mockCache, logger)
 
 	// Test that service is properly initialized
 	if service.config.UserAgent != "test-agent" {
@@ -755,5 +760,90 @@ func TestAdaptiveRateLimit(t *testing.T) {
 		if s.rateLimitState.adaptiveMultiplier != initialMultiplier {
 			t.Error("Expected multiplier to remain unchanged")
 		}
+	})
+}
+
+// roundTripFunc adapts a function to an http.RoundTripper for stubbing responses.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// TestCacheTTLConfiguration verifies that the cache TTLs configured via
+// CacheConfig (CACHE_TRANSCRIPT_TTL / CACHE_LANGUAGES_TTL) are the values
+// actually passed to cache.Set, and that a zero TTL falls back to the defaults.
+func TestCacheTTLConfiguration(t *testing.T) {
+	// Single-line player response so the ytInitialPlayerResponse regex matches.
+	playerJSON := `{"videoDetails":{"videoId":"testvideo01","title":"T","author":"A","channelId":"C","viewCount":"1"},"captions":{"playerCaptionsTracklistRenderer":{"captionTracks":[{"baseUrl":"https://transcript.test/track","languageCode":"en","isDefault":true}]}}}`
+	watchHTML := "var ytInitialPlayerResponse = " + playerJSON + ";"
+	transcriptXML := `<?xml version="1.0" encoding="utf-8"?><transcript><text start="0" dur="2">Hello world</text></transcript>`
+
+	newStubService := func(cacheCfg config.CacheConfig, mc *mockCache) *Service {
+		ycfg := config.YouTubeConfig{
+			DefaultLanguages:   []string{"en"},
+			RequestTimeout:     30 * time.Second,
+			RateLimitPerMinute: 600,
+			RateLimitPerHour:   10000,
+			UserAgent:          "test-agent",
+		}
+		svc := NewService(ycfg, cacheCfg, mc, slog.Default())
+		svc.httpClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			body := watchHTML
+			if strings.Contains(r.URL.Host, "transcript.test") {
+				body = transcriptXML
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(body)),
+				Header:     make(http.Header),
+			}, nil
+		})}
+		return svc
+	}
+
+	containsTTL := func(t *testing.T, mc *mockCache, want time.Duration) {
+		t.Helper()
+		for key, ttl := range mc.ttls {
+			if ttl == want {
+				return
+			}
+			t.Logf("recorded ttl for %q: %s", key, ttl)
+		}
+		t.Errorf("expected cache.Set to receive ttl %s, recorded: %v", want, mc.ttls)
+	}
+
+	t.Run("transcript uses configured TTL", func(t *testing.T) {
+		mc := newMockCache()
+		svc := newStubService(config.CacheConfig{TranscriptTTL: 2 * time.Hour}, mc)
+		if _, err := svc.GetTranscript(context.Background(), "testvideo01", []string{"en"}, false); err != nil {
+			t.Fatalf("GetTranscript failed: %v", err)
+		}
+		containsTTL(t, mc, 2*time.Hour)
+	})
+
+	t.Run("languages uses configured TTL", func(t *testing.T) {
+		mc := newMockCache()
+		svc := newStubService(config.CacheConfig{LanguagesTTL: 3 * time.Hour}, mc)
+		if _, err := svc.ListAvailableLanguages(context.Background(), "testvideo01"); err != nil {
+			t.Fatalf("ListAvailableLanguages failed: %v", err)
+		}
+		containsTTL(t, mc, 3*time.Hour)
+	})
+
+	t.Run("zero transcript TTL falls back to 24h", func(t *testing.T) {
+		mc := newMockCache()
+		svc := newStubService(config.CacheConfig{}, mc)
+		if _, err := svc.GetTranscript(context.Background(), "testvideo01", []string{"en"}, false); err != nil {
+			t.Fatalf("GetTranscript failed: %v", err)
+		}
+		containsTTL(t, mc, 24*time.Hour)
+	})
+
+	t.Run("zero languages TTL falls back to 6h", func(t *testing.T) {
+		mc := newMockCache()
+		svc := newStubService(config.CacheConfig{}, mc)
+		if _, err := svc.ListAvailableLanguages(context.Background(), "testvideo01"); err != nil {
+			t.Fatalf("ListAvailableLanguages failed: %v", err)
+		}
+		containsTTL(t, mc, 6*time.Hour)
 	})
 }

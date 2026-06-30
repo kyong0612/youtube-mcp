@@ -69,7 +69,7 @@ func main() {
 	}()
 
 	// Initialize YouTube service with fallback support
-	baseService := youtube.NewService(cfg.YouTube, cacheInstance, logger)
+	baseService := youtube.NewService(cfg.YouTube, cfg.Cache, cacheInstance, logger)
 	youtubeService := youtube.NewEnhancedService(baseService)
 
 	// Initialize MCP server

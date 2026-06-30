@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/kyong0612/youtube-mcp/internal/models"
 )
@@ -104,7 +103,7 @@ func (s *EnhancedService) GetTranscript(ctx context.Context, videoIdentifier str
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, response, time.Hour*24); err != nil {
+	if err := s.cache.Set(ctx, cacheKey, response, s.transcriptTTL); err != nil {
 		s.logger.Warn("Failed to cache transcript response", "error", err)
 	}
 
@@ -137,7 +136,7 @@ func (s *EnhancedService) ListAvailableLanguages(ctx context.Context, videoIdent
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, response, time.Hour*6); err != nil {
+	if err := s.cache.Set(ctx, cacheKey, response, s.languagesTTL); err != nil {
 		s.logger.Warn("Failed to cache languages response", "error", err)
 	}
 
