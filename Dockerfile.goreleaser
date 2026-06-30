@@ -1,0 +1,42 @@
+# Dockerfile used by GoReleaser's `dockers` block (see .goreleaser.yml).
+#
+# IMPORTANT: GoReleaser does NOT build from source here. Its docker build context
+# contains ONLY the binaries already produced by the `builds` section (plus any
+# declared extra_files). Therefore this Dockerfile must NOT run `go build` / `COPY . .`
+# (that is what the root `Dockerfile` does). It simply copies the prebuilt
+# `youtube-mcp` HTTP server binary (build id: youtube-mcp) into a minimal image.
+FROM alpine:latest
+
+# ca-certificates for HTTPS, tzdata for timezones, curl for the healthcheck.
+RUN apk --no-cache add ca-certificates tzdata curl
+
+ENV TZ=UTC
+
+# Create non-root user and app directory.
+RUN addgroup -g 1000 appuser && \
+    adduser -D -H -u 1000 -G appuser appuser && \
+    mkdir -p /app && chown appuser:appuser /app
+
+WORKDIR /app
+
+# Copy the prebuilt HTTP server binary from the GoReleaser build context.
+# The name must match the `binary:` of the goreleaser build id `youtube-mcp`.
+COPY youtube-mcp /app/youtube-mcp
+
+USER appuser
+
+# Expose HTTP and metrics ports.
+EXPOSE 8080 9090
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Set default environment variables
+ENV PORT=8080 \
+    LOG_LEVEL=info \
+    LOG_FORMAT=json \
+    CACHE_ENABLED=true \
+    CACHE_TYPE=memory
+
+ENTRYPOINT ["/app/youtube-mcp"]

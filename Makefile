@@ -159,7 +159,10 @@ mod-graph: ## Show dependency graph
 .PHONY: docker-build
 docker-build: ## Build Docker image
 	@echo "$(GREEN)Building Docker image...$(NC)"
-	docker build -t $(DOCKER_IMAGE) --build-arg VERSION=$(VERSION) .
+	docker build -t $(DOCKER_IMAGE) \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
+		--build-arg BUILD_TIME=$(BUILD_TIME) .
 	@echo "$(GREEN)Docker build complete!$(NC)"
 
 .PHONY: docker-run

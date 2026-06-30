@@ -116,12 +116,17 @@ dockers:
   - id: youtube-mcp
     goos: linux
     goarch: amd64
+    # Only copy the HTTP server binary (build id youtube-mcp) into the docker
+    # build context, so Dockerfile.goreleaser can `COPY youtube-mcp` directly.
+    ids:
+      - youtube-mcp
     image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/youtube-transcript-mcp:latest"
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/youtube-transcript-mcp:{{ .Tag }}"
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/youtube-transcript-mcp:{{ .Major }}"
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/youtube-transcript-mcp:{{ .Major }}.{{ .Minor }}"
-    dockerfile: Dockerfile
+    # GoReleaser-specific Dockerfile: copies the prebuilt binary (no build-from-source).
+    dockerfile: Dockerfile.goreleaser
     build_flag_templates:
       - "--pull"
       - "--label=org.opencontainers.image.created={{.Date}}"
