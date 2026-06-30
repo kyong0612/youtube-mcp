@@ -1,0 +1,55 @@
+# Smithery configuration for the YouTube Transcript MCP server.
+#
+# This server speaks the Model Context Protocol over stdio
+# (entry point: ./cmd/mcp, binary: youtube-mcp-stdio).
+#
+# Schema verified against the Smithery docs (https://smithery.ai/docs,
+# "Custom container" / project config) on 2026-06-30. The stdio form below
+# uses `startCommand.type: stdio` with a `commandFunction` that launches the
+# compiled stdio binary and maps the user-provided config to environment
+# variables consumed by internal/config/config.go.
+startCommand:
+  type: stdio
+  # JSON Schema describing the configuration users can supply when launching
+  # the server. Each field maps to an environment variable read by the server.
+  configSchema:
+    type: object
+    properties:
+      logLevel:
+        type: string
+        title: Log Level
+        description: Logging verbosity. Maps to the LOG_LEVEL environment variable.
+        enum:
+          - debug
+          - info
+          - warn
+          - error
+        default: info
+      defaultLanguages:
+        type: string
+        title: Default Languages
+        description: >-
+          Comma-separated preferred transcript language codes, e.g. "en,ja,es".
+          Maps to the YOUTUBE_DEFAULT_LANGUAGES environment variable.
+        default: en
+      cacheEnabled:
+        type: boolean
+        title: Cache Enabled
+        description: Enable in-memory transcript caching. Maps to the CACHE_ENABLED environment variable.
+        default: true
+  exampleConfig:
+    logLevel: info
+    defaultLanguages: en,ja
+    cacheEnabled: true
+  # Returns the command Smithery runs to start the stdio server, with the
+  # selected configuration injected as environment variables.
+  commandFunction: |
+    (config) => ({
+      command: 'youtube-mcp-stdio',
+      args: [],
+      env: {
+        LOG_LEVEL: config.logLevel || 'info',
+        YOUTUBE_DEFAULT_LANGUAGES: config.defaultLanguages || 'en',
+        CACHE_ENABLED: String(config.cacheEnabled !== false)
+      }
+    })
