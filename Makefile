@@ -2,6 +2,7 @@
 
 # Variables
 APP_NAME = youtube-transcript-mcp
+MCP_APP_NAME = youtube-mcp-stdio
 DOCKER_IMAGE = $(APP_NAME):latest
 DOCKER_CONTAINER = $(APP_NAME)
 GO_VERSION = 1.24.0
@@ -44,9 +45,17 @@ deps: tools ## Install Go dependencies and tools
 	go mod verify
 
 .PHONY: build
-build: ## Build the application
+build: ## Build the HTTP server and MCP stdio binaries
 	@echo "$(GREEN)Building $(APP_NAME)...$(NC)"
 	CGO_ENABLED=0 go build $(LDFLAGS) -a -installsuffix cgo -o $(APP_NAME) ./cmd/server/main.go
+	@echo "$(GREEN)Building $(MCP_APP_NAME)...$(NC)"
+	CGO_ENABLED=0 go build $(LDFLAGS) -a -installsuffix cgo -o $(MCP_APP_NAME) ./cmd/mcp/main.go
+	@echo "$(GREEN)Build complete!$(NC)"
+
+.PHONY: build-mcp
+build-mcp: ## Build only the MCP stdio binary (used by MCP clients)
+	@echo "$(GREEN)Building $(MCP_APP_NAME)...$(NC)"
+	CGO_ENABLED=0 go build $(LDFLAGS) -a -installsuffix cgo -o $(MCP_APP_NAME) ./cmd/mcp/main.go
 	@echo "$(GREEN)Build complete!$(NC)"
 
 .PHONY: build-all
@@ -58,6 +67,11 @@ build-all: ## Build for multiple platforms
 	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o dist/$(APP_NAME)-darwin-amd64 ./cmd/server/main.go
 	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/$(APP_NAME)-darwin-arm64 ./cmd/server/main.go
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o dist/$(APP_NAME)-windows-amd64.exe ./cmd/server/main.go
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/$(MCP_APP_NAME)-linux-amd64 ./cmd/mcp/main.go
+	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o dist/$(MCP_APP_NAME)-linux-arm64 ./cmd/mcp/main.go
+	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o dist/$(MCP_APP_NAME)-darwin-amd64 ./cmd/mcp/main.go
+	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/$(MCP_APP_NAME)-darwin-arm64 ./cmd/mcp/main.go
+	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o dist/$(MCP_APP_NAME)-windows-amd64.exe ./cmd/mcp/main.go
 	@echo "$(GREEN)Multi-platform build complete!$(NC)"
 
 .PHONY: run
@@ -75,6 +89,7 @@ clean: ## Clean build artifacts and caches
 	@echo "$(YELLOW)Cleaning...$(NC)"
 	go clean
 	rm -f $(APP_NAME)
+	rm -f $(MCP_APP_NAME)
 	rm -rf dist/
 	rm -f coverage.out coverage.html
 	rm -rf logs/ data/
