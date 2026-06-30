@@ -346,6 +346,92 @@ func TestHandleMCP_CallTool_ExecutionError(t *testing.T) {
 	}
 }
 
+func TestHandleRawMessage_CallTool_ExecutionError(t *testing.T) {
+	mockYT := &mockYouTubeService{
+		getTranscriptFunc: func(ctx context.Context, videoID string, languages []string, preserveFormatting bool) (*models.TranscriptResponse, error) {
+			return nil, &models.TranscriptError{
+				Type:    models.ErrorTypeNoTranscriptFound,
+				Message: "No transcript found for video",
+				VideoID: videoID,
+			}
+		},
+	}
+
+	cfg := config.MCPConfig{
+		MaxRequestSize: 5 * 1024 * 1024, // 5MB
+		RequestTimeout: 60 * time.Second,
+		Tools: map[string]bool{
+			"get_transcript": true,
+		},
+	}
+	server := NewServer(mockYT, cfg, slog.Default())
+
+	msg := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_transcript","arguments":{"video_identifier":"test123"}}}`)
+
+	raw, err := server.HandleRawMessage(context.Background(), msg)
+	if err != nil {
+		t.Fatalf("HandleRawMessage returned error: %v", err)
+	}
+
+	resp, ok := raw.(*models.MCPResponse)
+	if !ok {
+		t.Fatalf("Expected *models.MCPResponse, got %T", raw)
+	}
+
+	// Same boundary as the HTTP transport: execution failures are isError
+	// tool results, not protocol errors.
+	if resp.Error != nil {
+		t.Errorf("Expected no protocol error, got %v", resp.Error)
+	}
+
+	toolResult, ok := resp.Result.(models.MCPToolResult)
+	if !ok {
+		t.Fatalf("Expected result to be MCPToolResult, got %T", resp.Result)
+	}
+
+	if !toolResult.IsError {
+		t.Error("Expected isError to be true for execution failure")
+	}
+
+	if len(toolResult.Content) == 0 || toolResult.Content[0].Text == "" {
+		t.Error("Expected non-empty error text in content")
+	}
+}
+
+func TestHandleRawMessage_CallTool_InvalidArgs(t *testing.T) {
+	mockYT := &mockYouTubeService{}
+	cfg := config.MCPConfig{
+		MaxRequestSize: 5 * 1024 * 1024, // 5MB
+		RequestTimeout: 60 * time.Second,
+		Tools: map[string]bool{
+			"get_transcript": true,
+		},
+	}
+	server := NewServer(mockYT, cfg, slog.Default())
+
+	// Missing required video_identifier must surface as an invalid-params
+	// protocol error on the stdio transport too.
+	msg := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_transcript","arguments":{"languages":["en"]}}}`)
+
+	raw, err := server.HandleRawMessage(context.Background(), msg)
+	if err != nil {
+		t.Fatalf("HandleRawMessage returned error: %v", err)
+	}
+
+	resp, ok := raw.(*models.MCPResponse)
+	if !ok {
+		t.Fatalf("Expected *models.MCPResponse, got %T", raw)
+	}
+
+	if resp.Error == nil {
+		t.Fatal("Expected invalid params protocol error")
+	}
+
+	if resp.Error.Code != models.MCPErrorCodeInvalidParams {
+		t.Errorf("Expected invalid params error (%d), got %d", models.MCPErrorCodeInvalidParams, resp.Error.Code)
+	}
+}
+
 func TestHandleMCP_InvalidMethod(t *testing.T) {
 	mockYT := &mockYouTubeService{}
 	cfg := config.MCPConfig{
@@ -592,23 +678,14 @@ func TestValidation(t *testing.T) {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
 
-	// Validation happens inside tool execution, so per the MCP spec the
-	// failure is reported as an isError tool result, not a protocol error.
-	if response.Error != nil {
-		t.Errorf("Expected no top-level error, got %v", response.Error)
+	// Missing/invalid required arguments are a structural problem with the
+	// request, so per the MCP spec they are returned as a JSON-RPC
+	// invalid-params (-32602) protocol error, not as an isError tool result.
+	if response.Error == nil {
+		t.Fatal("Expected invalid params protocol error")
 	}
 
-	result, ok := response.Result.(map[string]any)
-	if !ok {
-		t.Fatal("Expected result to be a map")
-	}
-
-	if isErr, _ := result["isError"].(bool); !isErr {
-		t.Error("Expected isError to be true for validation failure")
-	}
-
-	content, ok := result["content"].([]any)
-	if !ok || len(content) == 0 {
-		t.Fatal("Expected non-empty content array")
+	if response.Error.Code != models.MCPErrorCodeInvalidParams {
+		t.Errorf("Expected invalid params error (%d), got %d", models.MCPErrorCodeInvalidParams, response.Error.Code)
 	}
 }

@@ -179,9 +179,24 @@ func (s *Server) handleCallTool(ctx context.Context, request models.MCPRequest) 
 
 	result, err := s.executeTool(toolCtx, toolCall.Name, toolCall.Arguments)
 	if err != nil {
-		// Per the MCP spec, tool execution errors are reported as a normal
-		// tool result with isError=true (so the LLM can read and recover),
-		// not as a protocol-level JSON-RPC error.
+		// Boundary between the two MCP error mechanisms:
+		//   - Structural problems with the call stay as JSON-RPC protocol
+		//     errors: invalid/missing arguments (-32602) and unknown tool
+		//     (-32601). These mean the request itself was malformed.
+		//   - Genuine tool execution failures (no transcript, network, etc.)
+		//     are returned as a normal tool result with isError=true so the
+		//     LLM can read and recover from them.
+		if mcpErr, ok := err.(*models.MCPError); ok {
+			switch mcpErr.Code {
+			case models.MCPErrorCodeInvalidParams, models.MCPErrorCodeMethodNotFound:
+				return &models.MCPResponse{
+					JSONRPC: "2.0",
+					ID:      request.ID,
+					Error:   mcpErr,
+				}
+			}
+		}
+
 		toolResult := models.MCPToolResult{
 			IsError: true,
 			Content: []models.MCPContent{
