@@ -1092,6 +1092,74 @@ func TestTranslateTranscript(t *testing.T) {
 	})
 }
 
+// TestEnhancedServiceTranslateTranscript verifies the *EnhancedService override of
+// TranslateTranscript. Without that override the promoted *Service.TranslateTranscript
+// runs, and its internal native-track GetTranscript call would bind to the base scraper
+// (Go has no virtual dispatch), bypassing the composite fetcher with kkdai fallback.
+func TestEnhancedServiceTranslateTranscript(t *testing.T) {
+	t.Run("auto-translates via tlang through EnhancedService", func(t *testing.T) {
+		var timedtextTLang string
+		var timedtextHit bool
+		server := newTranslateTestServer(t,
+			[]CaptionTrack{{LanguageCode: "en", IsTranslatable: true, IsDefault: true}},
+			func(r *http.Request) {
+				timedtextHit = true
+				timedtextTLang = r.URL.Query().Get("tlang")
+			},
+		)
+		defer server.Close()
+
+		enhanced := NewEnhancedService(newTranslateTestService(t, server))
+
+		resp, err := enhanced.TranslateTranscript(context.Background(), "abc123video", "ja", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !timedtextHit {
+			t.Fatal("expected timedtext endpoint to be called")
+		}
+		if timedtextTLang != "ja" {
+			t.Errorf("expected tlang=ja, got %q", timedtextTLang)
+		}
+		if resp.TranscriptType != transcriptTypeTranslated {
+			t.Errorf("expected translated transcript type, got %q", resp.TranscriptType)
+		}
+	})
+
+	t.Run("native target track delegates to the GetTranscript override", func(t *testing.T) {
+		server := newTranslateTestServer(t,
+			[]CaptionTrack{
+				{LanguageCode: "en", IsTranslatable: true, IsDefault: true},
+				{LanguageCode: "ja", IsTranslatable: false},
+			},
+			func(r *http.Request) {
+				if r.URL.Query().Has("tlang") {
+					t.Errorf("native track must not be auto-translated, saw tlang=%q", r.URL.Query().Get("tlang"))
+				}
+			},
+		)
+		defer server.Close()
+
+		base := newTranslateTestService(t, server)
+		enhanced := NewEnhancedService(base)
+
+		resp, err := enhanced.TranslateTranscript(context.Background(), "abc123video", "ja", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.Language != "ja" {
+			t.Errorf("expected Language=ja, got %q", resp.Language)
+		}
+		// The native retrieval must delegate to GetTranscript, which caches under the
+		// normal transcript key (distinct from the tlang key); its presence confirms the
+		// native path is served through GetTranscript rather than the tlang path.
+		normalKey := fmt.Sprintf("%sabc123video:ja", models.CacheKeyPrefixTranscript)
+		if _, found := base.cache.Get(context.Background(), normalKey); !found {
+			t.Errorf("expected native retrieval to populate normal transcript cache key %q", normalKey)
+		}
+	})
+}
+
 // newTranslateTestServer serves a YouTube-like watch page whose caption tracks point
 // back at the same server's /api/timedtext endpoint. onTimedtext, when non-nil, is
 // invoked for each timedtext request so tests can assert on the query parameters.

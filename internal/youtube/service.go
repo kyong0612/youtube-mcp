@@ -387,6 +387,17 @@ const transcriptTypeTranslated = "translated"
 // parameter is appended to a translatable source track's timedtext URL, which makes
 // YouTube return that track translated into targetLanguage on the fly.
 func (s *Service) TranslateTranscript(ctx context.Context, videoIdentifier, targetLanguage, sourceLanguage string) (*models.TranscriptResponse, error) {
+	return s.translateTranscript(ctx, videoIdentifier, targetLanguage, sourceLanguage, s.GetTranscript)
+}
+
+// translateTranscript implements TranslateTranscript. nativeFetch retrieves a native
+// caption track when targetLanguage already exists as one; it is injected because Go has
+// no virtual dispatch. When *EnhancedService passes its own GetTranscript method value,
+// the native-track retrieval flows through the composite fetcher (with kkdai fallback);
+// *Service passes its base implementation. The tlang auto-translation path always uses
+// the base scraper because it needs the caption track's timedtext URL, which the kkdai
+// fetcher does not expose.
+func (s *Service) translateTranscript(ctx context.Context, videoIdentifier, targetLanguage, sourceLanguage string, nativeFetch func(context.Context, string, []string, bool) (*models.TranscriptResponse, error)) (*models.TranscriptResponse, error) {
 	videoID, err := s.extractVideoID(videoIdentifier)
 	if err != nil {
 		return nil, &models.TranscriptError{
@@ -436,7 +447,7 @@ func (s *Service) TranslateTranscript(ctx context.Context, videoIdentifier, targ
 	for i := range captionTracks {
 		if languageCodeMatches(captionTracks[i].LanguageCode, targetLanguage) {
 			s.recordRateLimitSuccess()
-			return s.GetTranscript(ctx, videoID, []string{targetLanguage}, false)
+			return nativeFetch(ctx, videoID, []string{targetLanguage}, false)
 		}
 	}
 
