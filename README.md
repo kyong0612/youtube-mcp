@@ -1,6 +1,34 @@
 # YouTube Transcript MCP Server
 
+[![Go Version](https://img.shields.io/github/go-mod/go-version/kyong0612/youtube-mcp)](go.mod)
+[![License: MIT](https://img.shields.io/github/license/kyong0612/youtube-mcp)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/kyong0612/youtube-mcp/ci.yml?branch=main&label=CI)](https://github.com/kyong0612/youtube-mcp/actions/workflows/ci.yml)
+
 A high-performance Model Context Protocol (MCP) server for fetching YouTube video transcripts, implemented in Go.
+
+## ⚡ Quick Start (Claude Code)
+
+Install the stdio binary, then register it with Claude Code in a single command:
+
+```bash
+# 1. Install the stdio binary (requires Go 1.24+)
+go install github.com/kyong0612/youtube-mcp/cmd/mcp@latest
+mv "$(go env GOPATH)/bin/mcp" "$(go env GOPATH)/bin/youtube-mcp-stdio"
+
+# 2. Register the server with Claude Code (one-liner)
+claude mcp add youtube-transcript -- youtube-mcp-stdio
+```
+
+For Claude Desktop, Cursor, and manual JSON configuration, see the **MCP Client Setup** section below.
+
+## 🎬 Demo
+
+> **Demo GIF coming soon.** A short screen recording showing transcript fetching from an MCP client will be added here.
+
+## 📦 MCP Registry & Distribution
+
+- **Registries**: This server is being prepared for discovery via MCP registries such as the [MCP Registry](https://github.com/modelcontextprotocol/registry) and [Smithery](https://smithery.ai/). The registry manifest is added in a separate PR.
+- **Prebuilt binaries & Docker image**: Cross-platform binaries and a container image will be published after the first GitHub release is tagged. Until then, install via `go install` (above) or build from source (see the **Installation** section below).
 
 ## 🚀 Features
 
@@ -8,15 +36,15 @@ A high-performance Model Context Protocol (MCP) server for fetching YouTube vide
 - **5 Powerful Tools**:
   - `get_transcript`: Fetch transcript for a single video
   - `get_multiple_transcripts`: Batch process multiple videos
-  - `translate_transcript`: Translate transcripts to different languages
+  - `translate_transcript`: Fetch captions in the specified language (including YouTube's auto-translated captions when available). This does not machine-translate arbitrary text.
   - `format_transcript`: Format transcripts (plain text, SRT, VTT, etc.)
   - `list_available_languages`: List available subtitle languages
 - **High Performance**: Built with Go for speed and efficiency
-- **Caching**: In-memory and Redis cache support
+- **Caching**: In-memory cache implemented (Redis is planned/not yet implemented; `CACHE_TYPE=redis` currently falls back to the memory cache)
 - **Rate Limiting**: Protect against YouTube API limits
 - **Proxy Support**: Rotate through multiple proxies
 - **Docker Ready**: Easy deployment with Docker Compose
-- **Monitoring**: Built-in health checks and metrics
+- **Monitoring**: Built-in health checks (Prometheus metrics are planned/not yet implemented)
 
 ## 📋 Requirements
 
@@ -112,7 +140,19 @@ go build -o youtube-mcp-stdio ./cmd/mcp/
 
 #### Claude Code (claude.ai/code)
 
-Claude Code automatically detects MCP servers. Use the same configuration as Claude Desktop.
+Once `youtube-mcp-stdio` is on your `PATH` (see [Install via Go Install](#install-via-go-install)), register it with a single command:
+
+```bash
+claude mcp add youtube-transcript -- youtube-mcp-stdio
+```
+
+You can also point Claude Code at an explicit binary path and pass environment variables:
+
+```bash
+claude mcp add youtube-transcript \
+  --env YOUTUBE_DEFAULT_LANGUAGES=en,ja \
+  -- /path/to/youtube-mcp/youtube-mcp-stdio
+```
 
 #### Cursor
 
@@ -351,6 +391,8 @@ curl http://localhost:8080/ready
 ```
 
 ### Metrics
+
+> **Note**: Prometheus metrics are planned/not yet implemented. The `/metrics` endpoint currently returns a placeholder (`# TODO: Implement Prometheus metrics`) along with basic request stats.
 
 ```bash
 curl http://localhost:9090/metrics
