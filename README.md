@@ -8,15 +8,15 @@ A high-performance Model Context Protocol (MCP) server for fetching YouTube vide
 - **5 Powerful Tools**:
   - `get_transcript`: Fetch transcript for a single video
   - `get_multiple_transcripts`: Batch process multiple videos
-  - `translate_transcript`: Translate transcripts to different languages
+  - `translate_transcript`: Fetch captions in the specified language (including YouTube's auto-translated captions when available). This does not machine-translate arbitrary text.
   - `format_transcript`: Format transcripts (plain text, SRT, VTT, etc.)
   - `list_available_languages`: List available subtitle languages
 - **High Performance**: Built with Go for speed and efficiency
-- **Caching**: In-memory and Redis cache support
+- **Caching**: In-memory cache implemented (Redis is planned/not yet implemented; `CACHE_TYPE=redis` currently falls back to the memory cache)
 - **Rate Limiting**: Protect against YouTube API limits
 - **Proxy Support**: Rotate through multiple proxies
 - **Docker Ready**: Easy deployment with Docker Compose
-- **Monitoring**: Built-in health checks and metrics
+- **Monitoring**: Built-in health checks (Prometheus metrics are planned/not yet implemented)
 
 ## 📋 Requirements
 
@@ -351,6 +351,8 @@ curl http://localhost:8080/ready
 ```
 
 ### Metrics
+
+> **Note**: Prometheus metrics are planned/not yet implemented. The `/metrics` endpoint currently returns a placeholder (`# TODO: Implement Prometheus metrics`) along with basic request stats.
 
 ```bash
 curl http://localhost:9090/metrics
