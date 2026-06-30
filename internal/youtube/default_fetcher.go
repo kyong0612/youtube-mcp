@@ -2,6 +2,7 @@ package youtube
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -75,6 +76,17 @@ func (s *EnhancedService) GetTranscript(ctx context.Context, videoIdentifier str
 		}
 	}
 
+	// Negative cache: terminal failures are cached under a distinct key namespace
+	// (CacheKeyPrefixError) so they never collide with successful transcripts. A
+	// cached terminal error short-circuits the (slow) fetch and fails fast.
+	errorCacheKey := fmt.Sprintf("%s%s:%s", models.CacheKeyPrefixError, videoID, strings.Join(languages, ","))
+	if cached, found := s.cache.Get(ctx, errorCacheKey); found {
+		if cachedErr, ok := cached.(*models.TranscriptError); ok {
+			s.logger.Debug("Returning cached terminal error", "video_id", videoID, "error_type", cachedErr.Type)
+			return nil, cachedErr
+		}
+	}
+
 	// Use default languages if none provided
 	if len(languages) == 0 {
 		languages = s.config.DefaultLanguages
@@ -83,6 +95,15 @@ func (s *EnhancedService) GetTranscript(ctx context.Context, videoIdentifier str
 	// Use composite fetcher
 	response, err := s.compositeFetcher.FetchTranscript(ctx, videoID, languages)
 	if err != nil {
+		// Only terminal (permanent) errors are negative-cached; transient errors
+		// (network, rate limit, internal) are left uncached so they are retried.
+		if isTerminalError(err) {
+			var termErr *models.TranscriptError
+			_ = errors.As(err, &termErr)
+			if setErr := s.cache.Set(ctx, errorCacheKey, termErr, s.errorTTL); setErr != nil {
+				s.logger.Warn("Failed to cache terminal transcript error", "error", setErr)
+			}
+		}
 		return nil, err
 	}
 
@@ -141,4 +162,27 @@ func (s *EnhancedService) ListAvailableLanguages(ctx context.Context, videoIdent
 	}
 
 	return response, nil
+}
+
+// isTerminalError reports whether err is a permanent (terminal) transcript
+// failure that is safe to negative-cache. Terminal errors describe conditions
+// that will not change on retry within the cache window (the video has no
+// captions, is unavailable, has an invalid ID, or lacks the requested
+// language). Transient errors (network failures, rate limiting, internal
+// errors) are NOT terminal and must be retried rather than cached.
+func isTerminalError(err error) bool {
+	var transcriptErr *models.TranscriptError
+	if !errors.As(err, &transcriptErr) {
+		return false
+	}
+
+	switch transcriptErr.Type {
+	case models.ErrorTypeNoTranscriptFound,
+		models.ErrorTypeVideoUnavailable,
+		models.ErrorTypeInvalidVideoID,
+		models.ErrorTypeLanguageNotAvailable:
+		return true
+	default:
+		return false
+	}
 }

@@ -75,7 +75,6 @@ type CacheConfig struct {
 	Type              string        `json:"type"`
 	RedisPassword     string        `json:"redis_password"`
 	RedisURL          string        `json:"redis_url"`
-	MetadataTTL       time.Duration `json:"metadata_ttl"`
 	LanguagesTTL      time.Duration `json:"languages_ttl"`
 	ErrorTTL          time.Duration `json:"error_ttl"`
 	MaxSize           int           `json:"max_size"`
@@ -178,7 +177,6 @@ func DefaultConfig() *Config {
 			Type:              "memory",
 			Enabled:           true,
 			TranscriptTTL:     24 * time.Hour,
-			MetadataTTL:       1 * time.Hour,
 			LanguagesTTL:      6 * time.Hour,
 			ErrorTTL:          15 * time.Minute,
 			MaxSize:           1000,
@@ -275,7 +273,6 @@ func Load() (*Config, error) {
 	cfg.Cache.Type = getEnvString("CACHE_TYPE", cfg.Cache.Type)
 	cfg.Cache.Enabled = getEnvBool("CACHE_ENABLED", cfg.Cache.Enabled)
 	cfg.Cache.TranscriptTTL = getEnvDuration("CACHE_TRANSCRIPT_TTL", cfg.Cache.TranscriptTTL)
-	cfg.Cache.MetadataTTL = getEnvDuration("CACHE_METADATA_TTL", cfg.Cache.MetadataTTL)
 	cfg.Cache.LanguagesTTL = getEnvDuration("CACHE_LANGUAGES_TTL", cfg.Cache.LanguagesTTL)
 	cfg.Cache.ErrorTTL = getEnvDuration("CACHE_ERROR_TTL", cfg.Cache.ErrorTTL)
 	cfg.Cache.MaxSize = getEnvInt("CACHE_MAX_SIZE", cfg.Cache.MaxSize)
