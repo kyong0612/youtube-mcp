@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><title>Integration Test Video</title></head>
+<body>
+<!--
+  Minimal, hand-written fixture mimicking a YouTube /watch page.
+  parseVideoData() extracts the single-line player-response assignment in the
+  script tag below via regex, so that line MUST stay on one line.
+  The caption track baseUrl points at the YouTube timedtext endpoint; the test's
+  http.RoundTripper intercepts it and serves a saved caption XML fixture instead.
+-->
+<script>var ytInitialPlayerResponse = {"videoDetails":{"videoId":"TESTVIDEO01","title":"Integration Test Video","shortDescription":"A deterministic fixture used by the integration smoke tests.","channelId":"UCtest000000000000000000","author":"Test Channel","viewCount":"12345","isLiveContent":false},"captions":{"playerCaptionsTracklistRenderer":{"captionTracks":[{"baseUrl":"https://www.youtube.com/api/timedtext?v=TESTVIDEO01&lang=en","name":{"simpleText":"English"},"vssId":".en","languageCode":"en","isTranslatable":true,"isDefault":true}]}}};</script>
+</body>
+</html>

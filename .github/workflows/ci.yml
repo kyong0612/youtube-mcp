@@ -7,6 +7,10 @@ on:
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:
+  schedule:
+    # Daily 06:00 UTC. Drives the non-blocking live-canary job below; the gating
+    # jobs simply re-run on this schedule, which is harmless.
+    - cron: '0 6 * * *'
 
 env:
   GO_VERSION: '1.24.0'
@@ -92,6 +96,63 @@ jobs:
         flags: unittests
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: false
+
+  # Deterministic integration smoke tests (fixture-driven, no live network).
+  # Part of the gating pipeline. The live canary is skipped here because
+  # YT_LIVE_SMOKE is not set.
+  integration:
+    name: Integration (deterministic)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run deterministic integration tests
+      run: go test -v -tags=integration ./...
+
+  # Optional LIVE canary against real YouTube. NON-BLOCKING (continue-on-error)
+  # and only on schedule or manual dispatch. YouTube rate-limits CI IP ranges,
+  # so this must never gate merges.
+  live-canary:
+    name: Live Canary (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Run live canary
+      env:
+        YT_LIVE_SMOKE: '1'
+      run: go test -v -tags=integration -run TestLiveCanary ./tests/integration/...
 
   # Security scan
   security:

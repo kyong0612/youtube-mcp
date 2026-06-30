@@ -100,9 +100,9 @@ test-coverage: ## Run tests with coverage report
 	@echo "$(GREEN)Coverage report generated: coverage.html$(NC)"
 
 .PHONY: test-integration
-test-integration: ## Run integration tests
+test-integration: ## Run deterministic integration tests (live canary skipped unless YT_LIVE_SMOKE=1)
 	@echo "$(GREEN)Running integration tests...$(NC)"
-	go test -v -tags=integration ./tests/integration/...
+	go test -v -tags=integration ./...
 
 .PHONY: test-api
 test-api: ## Test API endpoints (requires running server)
