@@ -43,11 +43,19 @@ func NewEnhancedService(service *Service) *EnhancedService {
 	defaultFetcher := NewDefaultFetcher(service)
 	kkdaiFetcher := NewKkdaiFetcher()
 
-	// Create composite fetcher with fallback order
+	// Create composite fetcher with fallback order.
+	//
+	// kkdai/youtube is tried first because it is an actively maintained,
+	// widely-used library that tracks YouTube's player API and is more robust
+	// against markup changes. Our custom scraper depends on a fragile regex
+	// (`var ytInitialPlayerResponse = ({.+?});` in service.go) and YouTube's
+	// frequently-changing HTML, so it is kept only as a fallback for cases the
+	// library cannot handle (e.g. richer metadata such as view/like/comment
+	// counts and channel ID, or manual/generated transcript type detection).
 	compositeFetcher := NewCompositeFetcher(
 		service.logger,
-		defaultFetcher, // Try our implementation first
-		kkdaiFetcher,   // Fall back to kkdai library
+		kkdaiFetcher,   // Try the maintained kkdai library first
+		defaultFetcher, // Fall back to our custom HTML/regex scraper
 	)
 
 	return &EnhancedService{

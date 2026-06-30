@@ -84,6 +84,20 @@ func TestCompositeFetcher_FallbackBehavior(t *testing.T) {
 	assert.Len(t, languages.Languages, 1)
 }
 
+func TestNewEnhancedService_FetcherOrder(t *testing.T) {
+	// The enhanced service must try the maintained kkdai library before
+	// falling back to the custom HTML/regex scraper. Guard the order so a
+	// future refactor does not silently regress reliability.
+	svc := &Service{logger: setupTestLogger()}
+	enhanced := NewEnhancedService(svc)
+
+	fetchers := enhanced.compositeFetcher.fetchers
+	if assert.Len(t, fetchers, 2) {
+		assert.IsType(t, &KkdaiFetcher{}, fetchers[0], "first fetcher should be KkdaiFetcher")
+		assert.IsType(t, &DefaultFetcher{}, fetchers[1], "second fetcher should be DefaultFetcher")
+	}
+}
+
 func TestCompositeFetcher_AllFail(t *testing.T) {
 	logger := setupTestLogger()
 
