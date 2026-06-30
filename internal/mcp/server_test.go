@@ -262,6 +262,90 @@ func TestHandleMCP_CallTool_GetTranscript(t *testing.T) {
 	}
 }
 
+func TestHandleMCP_CallTool_ExecutionError(t *testing.T) {
+	mockYT := &mockYouTubeService{
+		getTranscriptFunc: func(ctx context.Context, videoID string, languages []string, preserveFormatting bool) (*models.TranscriptResponse, error) {
+			return nil, &models.TranscriptError{
+				Type:    models.ErrorTypeNoTranscriptFound,
+				Message: "No transcript found for video",
+				VideoID: videoID,
+			}
+		},
+	}
+
+	cfg := config.MCPConfig{
+		MaxRequestSize: 5 * 1024 * 1024, // 5MB
+		RequestTimeout: 60 * time.Second,
+		Tools: map[string]bool{
+			"get_transcript": true,
+		},
+	}
+	logger := slog.Default()
+
+	server := NewServer(mockYT, cfg, logger)
+
+	request := models.MCPRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  models.MCPMethodCallTool,
+		Params: map[string]any{
+			"name": "get_transcript",
+			"arguments": map[string]any{
+				"video_identifier": "test123",
+			},
+		},
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.HandleMCP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", rec.Code)
+	}
+
+	var response models.MCPResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	// Tool execution errors must be reported as a tool result with
+	// isError=true, never as a protocol-level JSON-RPC error.
+	if response.Error != nil {
+		t.Errorf("Expected no top-level error, got %v", response.Error)
+	}
+
+	result, ok := response.Result.(map[string]any)
+	if !ok {
+		t.Fatal("Expected result to be a map")
+	}
+
+	isErr, ok := result["isError"].(bool)
+	if !ok || !isErr {
+		t.Errorf("Expected isError to be true, got %v", result["isError"])
+	}
+
+	content, ok := result["content"].([]any)
+	if !ok || len(content) == 0 {
+		t.Fatal("Expected non-empty content array")
+	}
+
+	first, ok := content[0].(map[string]any)
+	if !ok {
+		t.Fatal("Expected content item to be a map")
+	}
+
+	text, ok := first["text"].(string)
+	if !ok || text == "" {
+		t.Error("Expected non-empty error text in content")
+	}
+}
+
 func TestHandleMCP_InvalidMethod(t *testing.T) {
 	mockYT := &mockYouTubeService{}
 	cfg := config.MCPConfig{
@@ -508,11 +592,23 @@ func TestValidation(t *testing.T) {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
 
-	if response.Error == nil {
-		t.Error("Expected validation error")
+	// Validation happens inside tool execution, so per the MCP spec the
+	// failure is reported as an isError tool result, not a protocol error.
+	if response.Error != nil {
+		t.Errorf("Expected no top-level error, got %v", response.Error)
 	}
 
-	if response.Error.Code != models.MCPErrorCodeInvalidParams {
-		t.Errorf("Expected invalid params error, got %d", response.Error.Code)
+	result, ok := response.Result.(map[string]any)
+	if !ok {
+		t.Fatal("Expected result to be a map")
+	}
+
+	if isErr, _ := result["isError"].(bool); !isErr {
+		t.Error("Expected isError to be true for validation failure")
+	}
+
+	content, ok := result["content"].([]any)
+	if !ok || len(content) == 0 {
+		t.Fatal("Expected non-empty content array")
 	}
 }
