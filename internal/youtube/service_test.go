@@ -2,6 +2,7 @@ package youtube
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -845,5 +846,109 @@ func TestCacheTTLConfiguration(t *testing.T) {
 			t.Fatalf("ListAvailableLanguages failed: %v", err)
 		}
 		containsTTL(t, mc, 6*time.Hour)
+	})
+}
+
+// recordingFetcher is a TranscriptFetcher stub that counts how many times it was
+// invoked and always returns a preconfigured error. It is used to verify that
+// terminal errors are negative-cached (fetcher called once) while transient
+// errors are not (fetcher re-invoked on every call).
+type recordingFetcher struct {
+	err   error
+	calls int
+}
+
+func (f *recordingFetcher) FetchTranscript(_ context.Context, videoID string, _ []string) (*models.TranscriptResponse, error) {
+	f.calls++
+	return nil, f.err
+}
+
+func (f *recordingFetcher) ListAvailableLanguages(_ context.Context, _ string) (*models.AvailableLanguagesResponse, error) {
+	f.calls++
+	return nil, f.err
+}
+
+// newEnhancedStub builds an EnhancedService whose composite fetcher is the given
+// fetcher, so tests can control the error returned by the fetch layer while
+// exercising the real negative-caching logic in EnhancedService.GetTranscript.
+func newEnhancedStub(cacheCfg config.CacheConfig, mc *mockCache, fetcher TranscriptFetcher) *EnhancedService {
+	ycfg := config.YouTubeConfig{
+		DefaultLanguages:   []string{"en"},
+		RequestTimeout:     30 * time.Second,
+		RateLimitPerMinute: 600,
+		RateLimitPerHour:   10000,
+		UserAgent:          "test-agent",
+	}
+	svc := NewService(ycfg, cacheCfg, mc, setupTestLogger())
+	return &EnhancedService{
+		Service:          svc,
+		compositeFetcher: NewCompositeFetcher(svc.logger, fetcher),
+	}
+}
+
+// TestNegativeCaching verifies that EnhancedService.GetTranscript negative-caches
+// terminal errors (so the slow fetch is skipped on repeat) but never caches
+// transient errors (so they keep being retried).
+func TestNegativeCaching(t *testing.T) {
+	t.Run("terminal error is cached and not re-fetched", func(t *testing.T) {
+		mc := newMockCache()
+		terminalErr := &models.TranscriptError{
+			Type:    models.ErrorTypeNoTranscriptFound,
+			Message: "no captions found",
+			VideoID: "testvideo01",
+		}
+		fetcher := &recordingFetcher{err: terminalErr}
+		enhanced := newEnhancedStub(config.CacheConfig{ErrorTTL: 10 * time.Minute}, mc, fetcher)
+
+		_, err1 := enhanced.GetTranscript(context.Background(), "testvideo01", []string{"en"}, false)
+		if err1 == nil {
+			t.Fatal("expected error on first call, got nil")
+		}
+		_, err2 := enhanced.GetTranscript(context.Background(), "testvideo01", []string{"en"}, false)
+		if err2 == nil {
+			t.Fatal("expected error on second call, got nil")
+		}
+
+		if fetcher.calls != 1 {
+			t.Errorf("expected fetcher to be invoked once (terminal error cached), got %d", fetcher.calls)
+		}
+
+		// The second call must return the cached *models.TranscriptError.
+		var termErr *models.TranscriptError
+		if !errors.As(err2, &termErr) || termErr.Type != models.ErrorTypeNoTranscriptFound {
+			t.Errorf("expected cached terminal error of type %s, got %v", models.ErrorTypeNoTranscriptFound, err2)
+		}
+
+		// The error must be cached under the distinct error namespace with errorTTL.
+		errKey := "error:testvideo01:en"
+		if ttl, ok := mc.ttls[errKey]; !ok || ttl != 10*time.Minute {
+			t.Errorf("expected error cached under %q with ttl 10m, got ttl=%v present=%v", errKey, ttl, ok)
+		}
+	})
+
+	t.Run("transient error is not cached and is retried", func(t *testing.T) {
+		mc := newMockCache()
+		transientErr := &models.TranscriptError{
+			Type:    models.ErrorTypeNetworkError,
+			Message: "network failure",
+			VideoID: "testvideo01",
+		}
+		fetcher := &recordingFetcher{err: transientErr}
+		enhanced := newEnhancedStub(config.CacheConfig{ErrorTTL: 10 * time.Minute}, mc, fetcher)
+
+		if _, err := enhanced.GetTranscript(context.Background(), "testvideo01", []string{"en"}, false); err == nil {
+			t.Fatal("expected error on first call, got nil")
+		}
+		if _, err := enhanced.GetTranscript(context.Background(), "testvideo01", []string{"en"}, false); err == nil {
+			t.Fatal("expected error on second call, got nil")
+		}
+
+		if fetcher.calls != 2 {
+			t.Errorf("expected fetcher to be invoked twice (transient error not cached), got %d", fetcher.calls)
+		}
+
+		if _, ok := mc.ttls["error:testvideo01:en"]; ok {
+			t.Error("transient error must not be written to the error cache")
+		}
 	})
 }

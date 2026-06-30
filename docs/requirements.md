@@ -524,7 +524,6 @@ type MCPConfig struct {
 type CacheConfig struct {
 	Enabled           bool          `yaml:"enabled"`
 	TranscriptTTL     time.Duration `yaml:"transcript_ttl"`
-	MetadataTTL       time.Duration `yaml:"metadata_ttl"`
 	ErrorTTL          time.Duration `yaml:"error_ttl"`
 	MaxSize           int           `yaml:"max_size"`
 	CleanupInterval   time.Duration `yaml:"cleanup_interval"`
@@ -561,7 +560,6 @@ func Load() (*Config, error) {
 		Cache: CacheConfig{
 			Enabled:         getEnvBool("CACHE_ENABLED", true),
 			TranscriptTTL:   getEnvDuration("CACHE_TRANSCRIPT_TTL", 24*time.Hour),
-			MetadataTTL:     getEnvDuration("CACHE_METADATA_TTL", 1*time.Hour),
 			ErrorTTL:        getEnvDuration("CACHE_ERROR_TTL", 15*time.Minute),
 			MaxSize:         getEnvInt("CACHE_MAX_SIZE", 1000),
 			CleanupInterval: getEnvDuration("CACHE_CLEANUP_INTERVAL", 1*time.Hour),
@@ -1740,7 +1738,6 @@ services:
       # Cache Configuration
       - CACHE_ENABLED=true
       - CACHE_TRANSCRIPT_TTL=24h
-      - CACHE_METADATA_TTL=1h
       - CACHE_ERROR_TTL=15m
       - CACHE_MAX_SIZE=1000
       - CACHE_CLEANUP_INTERVAL=1h
@@ -1834,7 +1831,6 @@ CACHE_ENABLED=true
 
 # Time-to-live for different cache types
 CACHE_TRANSCRIPT_TTL=24h
-CACHE_METADATA_TTL=1h
 CACHE_ERROR_TTL=15m
 
 # Maximum number of cached items
@@ -2345,7 +2341,6 @@ export CACHE_ENABLED=false
 
 # TTL調整
 export CACHE_TRANSCRIPT_TTL=1h
-export CACHE_METADATA_TTL=30m
 ```
 
 #### 同時接続数調整

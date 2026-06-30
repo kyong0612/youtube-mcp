@@ -34,6 +34,7 @@ type Service struct {
 	rateLimitState *RateLimitState
 	transcriptTTL  time.Duration
 	languagesTTL   time.Duration
+	errorTTL       time.Duration
 	config         config.YouTubeConfig
 }
 
@@ -116,6 +117,10 @@ func NewService(cfg config.YouTubeConfig, cacheCfg config.CacheConfig, cache cac
 	if languagesTTL <= 0 {
 		languagesTTL = 6 * time.Hour
 	}
+	errorTTL := cacheCfg.ErrorTTL
+	if errorTTL <= 0 {
+		errorTTL = 15 * time.Minute
+	}
 
 	return &Service{
 		config:        cfg,
@@ -127,6 +132,7 @@ func NewService(cfg config.YouTubeConfig, cacheCfg config.CacheConfig, cache cac
 		logger:        logger,
 		transcriptTTL: transcriptTTL,
 		languagesTTL:  languagesTTL,
+		errorTTL:      errorTTL,
 		rateLimitState: &RateLimitState{
 			adaptiveMultiplier: 1.0,
 		},
