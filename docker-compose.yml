@@ -7,6 +7,8 @@ services:
       dockerfile: Dockerfile
       args:
         - VERSION=${VERSION:-1.0.0}
+        - GIT_COMMIT=${GIT_COMMIT:-unknown}
+        - BUILD_TIME=${BUILD_TIME:-unknown}
     image: youtube-transcript-mcp:${VERSION:-latest}
     container_name: youtube-transcript-mcp
     restart: unless-stopped
