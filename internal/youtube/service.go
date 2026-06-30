@@ -32,6 +32,8 @@ type Service struct {
 	proxyManager   *ProxyManager
 	logger         *slog.Logger
 	rateLimitState *RateLimitState
+	transcriptTTL  time.Duration
+	languagesTTL   time.Duration
 	config         config.YouTubeConfig
 }
 
@@ -52,7 +54,7 @@ type ProxyManager struct {
 }
 
 // NewService creates a new YouTube service instance
-func NewService(cfg config.YouTubeConfig, cache cache.Cache, logger *slog.Logger) *Service {
+func NewService(cfg config.YouTubeConfig, cacheCfg config.CacheConfig, cache cache.Cache, logger *slog.Logger) *Service {
 	// Create HTTP client with custom transport
 	transport := &http.Transport{
 		MaxIdleConns:        100,
@@ -104,6 +106,17 @@ func NewService(cfg config.YouTubeConfig, cache cache.Cache, logger *slog.Logger
 	rateLimiter := rate.NewLimiter(rate.Every(time.Minute/time.Duration(rateLimitPerMinute)), rateLimitPerMinute)
 	hourlyLimiter := rate.NewLimiter(rate.Every(time.Hour/time.Duration(rateLimitPerHour)), rateLimitPerHour)
 
+	// Resolve cache TTLs with safe defaults when unset (a zero TTL would expire
+	// entries immediately given MemoryCache's time.Since(ts) > ttl check).
+	transcriptTTL := cacheCfg.TranscriptTTL
+	if transcriptTTL <= 0 {
+		transcriptTTL = 24 * time.Hour
+	}
+	languagesTTL := cacheCfg.LanguagesTTL
+	if languagesTTL <= 0 {
+		languagesTTL = 6 * time.Hour
+	}
+
 	return &Service{
 		config:        cfg,
 		httpClient:    httpClient,
@@ -112,6 +125,8 @@ func NewService(cfg config.YouTubeConfig, cache cache.Cache, logger *slog.Logger
 		hourlyLimiter: hourlyLimiter,
 		proxyManager:  proxyManager,
 		logger:        logger,
+		transcriptTTL: transcriptTTL,
+		languagesTTL:  languagesTTL,
 		rateLimitState: &RateLimitState{
 			adaptiveMultiplier: 1.0,
 		},
@@ -219,7 +234,7 @@ func (s *Service) GetTranscript(ctx context.Context, videoIdentifier string, lan
 	response.DurationSeconds = s.calculateDuration(transcript)
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, response, s.config.RequestTimeout); err != nil {
+	if err := s.cache.Set(ctx, cacheKey, response, s.transcriptTTL); err != nil {
 		s.logger.Warn("Failed to cache transcript response", "error", err)
 	}
 
@@ -366,7 +381,7 @@ func (s *Service) ListAvailableLanguages(ctx context.Context, videoIdentifier st
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, response, s.config.RequestTimeout); err != nil {
+	if err := s.cache.Set(ctx, cacheKey, response, s.languagesTTL); err != nil {
 		s.logger.Warn("Failed to cache transcript response", "error", err)
 	}
 
