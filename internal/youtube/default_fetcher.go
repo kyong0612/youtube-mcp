@@ -119,6 +119,15 @@ func (s *EnhancedService) GetTranscript(ctx context.Context, videoIdentifier str
 	return response, nil
 }
 
+// TranslateTranscript overrides the promoted *Service method so that, when the target
+// language already exists as a native caption track, the retrieval flows through this
+// type's GetTranscript override (composite fetcher with kkdai fallback) instead of the
+// base scraper. The tlang auto-translation path still relies on the base scraper because
+// it needs the caption track's timedtext URL, which the kkdai fetcher does not expose.
+func (s *EnhancedService) TranslateTranscript(ctx context.Context, videoIdentifier, targetLanguage, sourceLanguage string) (*models.TranscriptResponse, error) {
+	return s.Service.translateTranscript(ctx, videoIdentifier, targetLanguage, sourceLanguage, s.GetTranscript)
+}
+
 // ListAvailableLanguages overrides to use composite fetcher
 func (s *EnhancedService) ListAvailableLanguages(ctx context.Context, videoIdentifier string) (*models.AvailableLanguagesResponse, error) {
 	videoID, err := s.extractVideoID(videoIdentifier)

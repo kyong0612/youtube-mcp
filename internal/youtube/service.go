@@ -373,30 +373,219 @@ func (s *Service) ListAvailableLanguages(ctx context.Context, videoIdentifier st
 	return response, nil
 }
 
-// TranslateTranscript translates a transcript to target language
+// translatedSourceMarker is recorded in TranscriptMetadata.Source when a transcript
+// is produced via YouTube's auto-translation instead of a native caption track.
+const translatedSourceMarker = "youtube-translated"
+
+// transcriptTypeTranslated marks a transcript produced via YouTube auto-translation.
+const transcriptTypeTranslated = "translated"
+
+// TranslateTranscript returns the transcript of a video in targetLanguage.
+//
+// If the video already has a native caption track in targetLanguage, that track is
+// returned directly. Otherwise it uses YouTube's auto-translation: the "tlang" query
+// parameter is appended to a translatable source track's timedtext URL, which makes
+// YouTube return that track translated into targetLanguage on the fly.
 func (s *Service) TranslateTranscript(ctx context.Context, videoIdentifier, targetLanguage, sourceLanguage string) (*models.TranscriptResponse, error) {
-	// First get available languages
-	availableLanguages, err := s.ListAvailableLanguages(ctx, videoIdentifier)
+	return s.translateTranscript(ctx, videoIdentifier, targetLanguage, sourceLanguage, s.GetTranscript)
+}
+
+// translateTranscript implements TranslateTranscript. nativeFetch retrieves a native
+// caption track when targetLanguage already exists as one; it is injected because Go has
+// no virtual dispatch. When *EnhancedService passes its own GetTranscript method value,
+// the native-track retrieval flows through the composite fetcher (with kkdai fallback);
+// *Service passes its base implementation. The tlang auto-translation path always uses
+// the base scraper because it needs the caption track's timedtext URL, which the kkdai
+// fetcher does not expose.
+func (s *Service) translateTranscript(ctx context.Context, videoIdentifier, targetLanguage, sourceLanguage string, nativeFetch func(context.Context, string, []string, bool) (*models.TranscriptResponse, error)) (*models.TranscriptResponse, error) {
+	videoID, err := s.extractVideoID(videoIdentifier)
+	if err != nil {
+		return nil, &models.TranscriptError{
+			Type:    models.ErrorTypeInvalidVideoID,
+			Message: fmt.Sprintf("Invalid video identifier: %s", err.Error()),
+			VideoID: videoIdentifier,
+		}
+	}
+
+	// Distinct cache key so auto-translated results never collide with native transcripts.
+	cacheKey := fmt.Sprintf("%s%s:tlang:%s:%s", models.CacheKeyPrefixTranscript, videoID, sourceLanguage, targetLanguage)
+	if cached, found := s.cache.Get(ctx, cacheKey); found {
+		if transcript, ok := cached.(*models.TranscriptResponse); ok {
+			s.logger.Debug("Returning cached translated transcript",
+				slog.String("video_id", videoID),
+				slog.String("target_language", targetLanguage))
+			return transcript, nil
+		}
+	}
+
+	// Respect rate limits before making any network calls.
+	if waitErr := s.waitForRateLimit(ctx); waitErr != nil {
+		return nil, &models.TranscriptError{
+			Type:    models.ErrorTypeRateLimitExceeded,
+			Message: fmt.Sprintf("Rate limit exceeded: %s", waitErr.Error()),
+			VideoID: videoID,
+		}
+	}
+
+	// Fetch the caption tracks available for this video.
+	videoData, err := s.fetchVideoData(ctx, videoID)
+	if err != nil {
+		s.recordRateLimitFailure(err)
+		return nil, err
+	}
+
+	captionTracks, err := s.extractCaptionTracks(videoData)
+	if err != nil {
+		return nil, &models.TranscriptError{
+			Type:    models.ErrorTypeNoTranscriptFound,
+			Message: fmt.Sprintf("No captions found: %s", err.Error()),
+			VideoID: videoID,
+		}
+	}
+
+	// If a native caption track already exists in the target language, return it directly.
+	for i := range captionTracks {
+		if languageCodeMatches(captionTracks[i].LanguageCode, targetLanguage) {
+			s.recordRateLimitSuccess()
+			return nativeFetch(ctx, videoID, []string{targetLanguage}, false)
+		}
+	}
+
+	// Otherwise pick a translatable source track and use YouTube's auto-translation.
+	sourceTrack := s.selectTranslationSourceTrack(captionTracks, sourceLanguage)
+	if sourceTrack == nil {
+		return nil, &models.TranscriptError{
+			Type:        models.ErrorTypeLanguageNotAvailable,
+			Message:     fmt.Sprintf("No translatable caption track available to translate into %q", targetLanguage),
+			VideoID:     videoID,
+			Suggestions: s.getAvailableLanguageCodes(captionTracks),
+		}
+	}
+
+	response, err := s.fetchTranslatedTranscript(ctx, videoData, sourceTrack, targetLanguage)
+	if err != nil {
+		s.recordRateLimitFailure(err)
+		return nil, err
+	}
+
+	// Cache the translated result.
+	if err := s.cache.Set(ctx, cacheKey, response, s.config.RequestTimeout); err != nil {
+		s.logger.Warn("Failed to cache translated transcript response", "error", err)
+	}
+
+	s.recordRateLimitSuccess()
+	return response, nil
+}
+
+// selectTranslationSourceTrack picks the best translatable caption track to feed into
+// YouTube's tlang auto-translation. Only translatable tracks are eligible because a
+// non-translatable track cannot be auto-translated; nil is returned when none exist.
+// Preference order: a translatable track matching sourceLanguage, then the default
+// translatable track, then the first translatable track.
+func (s *Service) selectTranslationSourceTrack(tracks []CaptionTrack, sourceLanguage string) *CaptionTrack {
+	// 1. Prefer a translatable track matching the requested source language.
+	if sourceLanguage != "" {
+		for i := range tracks {
+			if tracks[i].IsTranslatable && languageCodeMatches(tracks[i].LanguageCode, sourceLanguage) {
+				return &tracks[i]
+			}
+		}
+	}
+
+	// 2. Prefer the default translatable track.
+	for i := range tracks {
+		if tracks[i].IsTranslatable && tracks[i].IsDefault {
+			return &tracks[i]
+		}
+	}
+
+	// 3. Fall back to the first translatable track.
+	for i := range tracks {
+		if tracks[i].IsTranslatable {
+			return &tracks[i]
+		}
+	}
+
+	return nil
+}
+
+// fetchTranslatedTranscript fetches sourceTrack auto-translated into targetLanguage by
+// adding the tlang query parameter to its timedtext URL, then builds a TranscriptResponse.
+func (s *Service) fetchTranslatedTranscript(ctx context.Context, videoData *VideoData, sourceTrack *CaptionTrack, targetLanguage string) (*models.TranscriptResponse, error) {
+	translatedURL, err := addTranslationParam(sourceTrack.BaseURL, targetLanguage)
+	if err != nil {
+		return nil, &models.TranscriptError{
+			Type:    models.ErrorTypeParsingError,
+			Message: fmt.Sprintf("Failed to build translation URL: %s", err.Error()),
+			VideoID: videoData.VideoID,
+		}
+	}
+
+	// Clone the source track with the translated URL and target language so the existing
+	// fetch/parse helpers can be reused unchanged.
+	translatedTrack := *sourceTrack
+	translatedTrack.BaseURL = translatedURL
+	translatedTrack.LanguageCode = targetLanguage
+
+	s.logger.Debug("Fetching auto-translated transcript",
+		slog.String("video_id", videoData.VideoID),
+		slog.String("source_language", sourceTrack.LanguageCode),
+		slog.String("target_language", targetLanguage),
+		slog.String("url", translatedURL))
+
+	segments, err := s.fetchTranscriptFromTrack(ctx, &translatedTrack)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if target language is available
-	var targetFound bool
-	for _, lang := range availableLanguages.Languages {
-		if lang.Code == targetLanguage {
-			targetFound = true
-			break
-		}
+	response := &models.TranscriptResponse{
+		VideoID:        videoData.VideoID,
+		Title:          videoData.Title,
+		Description:    videoData.Description,
+		Language:       targetLanguage,
+		TranscriptType: transcriptTypeTranslated,
+		Transcript:     segments,
+		Metadata: models.TranscriptMetadata{
+			ExtractionTimestamp: time.Now().UTC(),
+			LanguageDetected:    targetLanguage,
+			Source:              translatedSourceMarker,
+			ChannelID:           videoData.ChannelID,
+			ChannelName:         videoData.ChannelName,
+			PublishedAt:         videoData.PublishedAt,
+			ViewCount:           videoData.ViewCount,
+			LikeCount:           videoData.LikeCount,
+			CommentCount:        videoData.CommentCount,
+		},
 	}
 
-	if !targetFound {
-		// Try to get auto-translated version
-		return s.GetTranscript(ctx, videoIdentifier, []string{targetLanguage}, false)
+	response.FormattedText = s.formatTranscriptText(segments)
+	response.WordCount = s.countWords(response.FormattedText)
+	response.CharCount = len(response.FormattedText)
+	response.DurationSeconds = s.calculateDuration(segments)
+
+	return response, nil
+}
+
+// addTranslationParam returns baseURL with the YouTube auto-translation query parameter
+// (tlang) set to targetLanguage. Existing query parameters are preserved.
+func addTranslationParam(baseURL, targetLanguage string) (string, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
 	}
 
-	// Get transcript in target language
-	return s.GetTranscript(ctx, videoIdentifier, []string{targetLanguage}, false)
+	q := u.Query()
+	q.Set("tlang", targetLanguage)
+	u.RawQuery = q.Encode()
+
+	return u.String(), nil
+}
+
+// languageCodeMatches reports whether a caption track's language code satisfies a
+// requested language, matching either exactly ("en" == "en") or by prefix ("en-US"
+// for requested "en").
+func languageCodeMatches(trackCode, requested string) bool {
+	return trackCode == requested || strings.HasPrefix(trackCode, requested+"-")
 }
 
 // FormatTranscript formats a transcript according to specified format

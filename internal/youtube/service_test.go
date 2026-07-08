@@ -2,9 +2,12 @@ package youtube
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -756,4 +759,449 @@ func TestAdaptiveRateLimit(t *testing.T) {
 			t.Error("Expected multiplier to remain unchanged")
 		}
 	})
+}
+
+func TestLanguageCodeMatches(t *testing.T) {
+	tests := []struct {
+		trackCode string
+		requested string
+		expected  bool
+	}{
+		{"en", "en", true},
+		{"en-US", "en", true},
+		{"en", "en-US", false},
+		{"es", "en", false},
+		{"ja", "ja", true},
+		{"pt-BR", "pt", true},
+	}
+
+	for _, tt := range tests {
+		if got := languageCodeMatches(tt.trackCode, tt.requested); got != tt.expected {
+			t.Errorf("languageCodeMatches(%q, %q) = %v, want %v", tt.trackCode, tt.requested, got, tt.expected)
+		}
+	}
+}
+
+func TestAddTranslationParam(t *testing.T) {
+	t.Run("adds tlang preserving existing params", func(t *testing.T) {
+		out, err := addTranslationParam("https://www.youtube.com/api/timedtext?v=abc&lang=en", "ja")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		u, err := url.Parse(out)
+		if err != nil {
+			t.Fatalf("result is not a valid URL: %v", err)
+		}
+		q := u.Query()
+		if q.Get("tlang") != "ja" {
+			t.Errorf("expected tlang=ja, got %q", q.Get("tlang"))
+		}
+		if q.Get("v") != "abc" {
+			t.Errorf("expected v=abc preserved, got %q", q.Get("v"))
+		}
+		if q.Get("lang") != "en" {
+			t.Errorf("expected lang=en preserved, got %q", q.Get("lang"))
+		}
+	})
+
+	t.Run("overwrites existing tlang", func(t *testing.T) {
+		out, err := addTranslationParam("https://www.youtube.com/api/timedtext?v=abc&tlang=fr", "ja")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		u, _ := url.Parse(out)
+		if got := u.Query().Get("tlang"); got != "ja" {
+			t.Errorf("expected tlang overwritten to ja, got %q", got)
+		}
+	})
+
+	t.Run("invalid URL returns error", func(t *testing.T) {
+		if _, err := addTranslationParam("://not-a-url", "ja"); err == nil {
+			t.Error("expected error for invalid URL, got nil")
+		}
+	})
+}
+
+func TestSelectTranslationSourceTrack(t *testing.T) {
+	s := &Service{}
+
+	tracks := []CaptionTrack{
+		{LanguageCode: "en", IsTranslatable: true, IsDefault: true},
+		{LanguageCode: "ja", IsTranslatable: true},
+		{LanguageCode: "ko", IsTranslatable: false},
+	}
+
+	tests := []struct {
+		name           string
+		sourceLanguage string
+		tracks         []CaptionTrack
+		expectNil      bool
+		expectedCode   string
+	}{
+		{
+			name:           "matches requested source language",
+			sourceLanguage: "ja",
+			tracks:         tracks,
+			expectedCode:   "ja",
+		},
+		{
+			name:           "prefers default translatable when no source given",
+			sourceLanguage: "",
+			tracks:         tracks,
+			expectedCode:   "en",
+		},
+		{
+			name:           "falls back to first translatable when source not found",
+			sourceLanguage: "fr",
+			tracks:         tracks,
+			expectedCode:   "en",
+		},
+		{
+			name:           "first translatable when no default",
+			sourceLanguage: "",
+			tracks:         []CaptionTrack{{LanguageCode: "ko", IsTranslatable: false}, {LanguageCode: "ja", IsTranslatable: true}},
+			expectedCode:   "ja",
+		},
+		{
+			name:           "nil when no translatable tracks",
+			sourceLanguage: "",
+			tracks:         []CaptionTrack{{LanguageCode: "ko", IsTranslatable: false}},
+			expectNil:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := s.selectTranslationSourceTrack(tt.tracks, tt.sourceLanguage)
+			if tt.expectNil {
+				if got != nil {
+					t.Errorf("expected nil track, got %+v", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatal("expected a track but got nil")
+			}
+			if got.LanguageCode != tt.expectedCode {
+				t.Errorf("expected language %q, got %q", tt.expectedCode, got.LanguageCode)
+			}
+		})
+	}
+}
+
+// newTestService builds a Service backed by a mock cache and generous rate limits,
+// suitable for exercising the network paths against an httptest server.
+func newTestService() *Service {
+	cfg := config.YouTubeConfig{
+		DefaultLanguages:   []string{"en"},
+		RequestTimeout:     30 * time.Second,
+		RetryAttempts:      2,
+		RetryDelay:         time.Millisecond,
+		RateLimitPerMinute: 6000,
+		RateLimitPerHour:   60000,
+		UserAgent:          "test-agent",
+	}
+	return NewService(cfg, newMockCache(), slog.Default())
+}
+
+// hostRewriteTransport redirects every outgoing request to a fixed target host
+// (the httptest server) while preserving the path and query, so code that hardcodes
+// www.youtube.com can be tested without live network access.
+type hostRewriteTransport struct {
+	base   http.RoundTripper
+	target *url.URL
+}
+
+func (t *hostRewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.URL.Scheme = t.target.Scheme
+	req.URL.Host = t.target.Host
+	return t.base.RoundTrip(req)
+}
+
+const jaTranslatedXML = `<?xml version="1.0" encoding="utf-8"?>
+<transcript>
+	<text start="0" dur="2">こんにちは世界</text>
+	<text start="2" dur="3">これはテストです</text>
+</transcript>`
+
+func buildWatchHTML(t *testing.T, tracks []CaptionTrack) string {
+	t.Helper()
+	pr := PlayerResponse{
+		VideoDetails: &VideoDetails{
+			Title:     "Test Video",
+			ChannelID: "chan-1",
+			Author:    "Author",
+			ViewCount: "100",
+		},
+		Captions: &Captions{
+			PlayerCaptionsTracklistRenderer: PlayerCaptionsTracklistRenderer{
+				CaptionTracks: tracks,
+			},
+		},
+	}
+	b, err := json.Marshal(pr)
+	if err != nil {
+		t.Fatalf("failed to marshal player response: %v", err)
+	}
+	// The parser extracts a single-line `var ytInitialPlayerResponse = {...};` assignment.
+	return "<html><body><script>var ytInitialPlayerResponse = " + string(b) + ";</script></body></html>"
+}
+
+func TestFetchTranslatedTranscript(t *testing.T) {
+	var capturedTLang string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedTLang = r.URL.Query().Get("tlang")
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(jaTranslatedXML))
+	}))
+	defer server.Close()
+
+	s := newTestService()
+
+	sourceTrack := &CaptionTrack{
+		BaseURL:        server.URL + "/api/timedtext?v=abc&lang=en",
+		LanguageCode:   "en",
+		IsTranslatable: true,
+	}
+	videoData := &VideoData{VideoID: "abc123video", Title: "Test Video", ChannelName: "Author"}
+
+	resp, err := s.fetchTranslatedTranscript(context.Background(), videoData, sourceTrack, "ja")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if capturedTLang != "ja" {
+		t.Errorf("expected tlang=ja sent to timedtext endpoint, got %q", capturedTLang)
+	}
+	if resp.Language != "ja" {
+		t.Errorf("expected Language=ja, got %q", resp.Language)
+	}
+	if resp.TranscriptType != transcriptTypeTranslated {
+		t.Errorf("expected TranscriptType=%q, got %q", transcriptTypeTranslated, resp.TranscriptType)
+	}
+	if resp.Metadata.Source != translatedSourceMarker {
+		t.Errorf("expected Source=%q, got %q", translatedSourceMarker, resp.Metadata.Source)
+	}
+	if len(resp.Transcript) != 2 {
+		t.Fatalf("expected 2 segments, got %d", len(resp.Transcript))
+	}
+	if resp.Transcript[0].Text != "こんにちは世界" {
+		t.Errorf("unexpected first segment text: %q", resp.Transcript[0].Text)
+	}
+}
+
+func TestTranslateTranscript(t *testing.T) {
+	t.Run("auto-translates via tlang when target track is missing", func(t *testing.T) {
+		var timedtextTLang string
+		var timedtextHit bool
+		server := newTranslateTestServer(t,
+			[]CaptionTrack{{
+				LanguageCode:   "en",
+				IsTranslatable: true,
+				IsDefault:      true,
+			}},
+			func(r *http.Request) {
+				timedtextHit = true
+				timedtextTLang = r.URL.Query().Get("tlang")
+			},
+		)
+		defer server.Close()
+
+		s := newTranslateTestService(t, server)
+
+		resp, err := s.TranslateTranscript(context.Background(), "abc123video", "ja", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !timedtextHit {
+			t.Fatal("expected timedtext endpoint to be called")
+		}
+		if timedtextTLang != "ja" {
+			t.Errorf("expected tlang=ja, got %q", timedtextTLang)
+		}
+		if resp.Language != "ja" {
+			t.Errorf("expected Language=ja, got %q", resp.Language)
+		}
+		if resp.TranscriptType != transcriptTypeTranslated {
+			t.Errorf("expected translated transcript type, got %q", resp.TranscriptType)
+		}
+		if resp.Metadata.Source != translatedSourceMarker {
+			t.Errorf("expected source marker %q, got %q", translatedSourceMarker, resp.Metadata.Source)
+		}
+		if len(resp.Transcript) != 2 {
+			t.Errorf("expected 2 segments, got %d", len(resp.Transcript))
+		}
+	})
+
+	t.Run("returns native track without tlang when target exists", func(t *testing.T) {
+		var timedtextTLang string
+		var sawTLang bool
+		server := newTranslateTestServer(t,
+			[]CaptionTrack{
+				{LanguageCode: "en", IsTranslatable: true, IsDefault: true},
+				{LanguageCode: "ja", IsTranslatable: false},
+			},
+			func(r *http.Request) {
+				if r.URL.Query().Has("tlang") {
+					sawTLang = true
+					timedtextTLang = r.URL.Query().Get("tlang")
+				}
+			},
+		)
+		defer server.Close()
+
+		s := newTranslateTestService(t, server)
+
+		resp, err := s.TranslateTranscript(context.Background(), "abc123video", "ja", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if sawTLang {
+			t.Errorf("expected no tlang for native track, but saw tlang=%q", timedtextTLang)
+		}
+		if resp.Language != "ja" {
+			t.Errorf("expected Language=ja, got %q", resp.Language)
+		}
+	})
+
+	t.Run("errors when no translatable track exists", func(t *testing.T) {
+		server := newTranslateTestServer(t,
+			[]CaptionTrack{{LanguageCode: "en", IsTranslatable: false, IsDefault: true}},
+			nil,
+		)
+		defer server.Close()
+
+		s := newTranslateTestService(t, server)
+
+		_, err := s.TranslateTranscript(context.Background(), "abc123video", "ja", "")
+		if err == nil {
+			t.Fatal("expected an error, got nil")
+		}
+		var transcriptErr *models.TranscriptError
+		if te, ok := err.(*models.TranscriptError); ok {
+			transcriptErr = te
+		} else {
+			t.Fatalf("expected *models.TranscriptError, got %T", err)
+		}
+		if transcriptErr.Type != models.ErrorTypeLanguageNotAvailable {
+			t.Errorf("expected error type %q, got %q", models.ErrorTypeLanguageNotAvailable, transcriptErr.Type)
+		}
+		if len(transcriptErr.Suggestions) == 0 || transcriptErr.Suggestions[0] != "en" {
+			t.Errorf("expected suggestions to list available languages, got %v", transcriptErr.Suggestions)
+		}
+	})
+}
+
+// TestEnhancedServiceTranslateTranscript verifies the *EnhancedService override of
+// TranslateTranscript. Without that override the promoted *Service.TranslateTranscript
+// runs, and its internal native-track GetTranscript call would bind to the base scraper
+// (Go has no virtual dispatch), bypassing the composite fetcher with kkdai fallback.
+func TestEnhancedServiceTranslateTranscript(t *testing.T) {
+	t.Run("auto-translates via tlang through EnhancedService", func(t *testing.T) {
+		var timedtextTLang string
+		var timedtextHit bool
+		server := newTranslateTestServer(t,
+			[]CaptionTrack{{LanguageCode: "en", IsTranslatable: true, IsDefault: true}},
+			func(r *http.Request) {
+				timedtextHit = true
+				timedtextTLang = r.URL.Query().Get("tlang")
+			},
+		)
+		defer server.Close()
+
+		enhanced := NewEnhancedService(newTranslateTestService(t, server))
+
+		resp, err := enhanced.TranslateTranscript(context.Background(), "abc123video", "ja", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !timedtextHit {
+			t.Fatal("expected timedtext endpoint to be called")
+		}
+		if timedtextTLang != "ja" {
+			t.Errorf("expected tlang=ja, got %q", timedtextTLang)
+		}
+		if resp.TranscriptType != transcriptTypeTranslated {
+			t.Errorf("expected translated transcript type, got %q", resp.TranscriptType)
+		}
+	})
+
+	t.Run("native target track delegates to the GetTranscript override", func(t *testing.T) {
+		server := newTranslateTestServer(t,
+			[]CaptionTrack{
+				{LanguageCode: "en", IsTranslatable: true, IsDefault: true},
+				{LanguageCode: "ja", IsTranslatable: false},
+			},
+			func(r *http.Request) {
+				if r.URL.Query().Has("tlang") {
+					t.Errorf("native track must not be auto-translated, saw tlang=%q", r.URL.Query().Get("tlang"))
+				}
+			},
+		)
+		defer server.Close()
+
+		base := newTranslateTestService(t, server)
+		enhanced := NewEnhancedService(base)
+
+		resp, err := enhanced.TranslateTranscript(context.Background(), "abc123video", "ja", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.Language != "ja" {
+			t.Errorf("expected Language=ja, got %q", resp.Language)
+		}
+		// The native retrieval must delegate to GetTranscript, which caches under the
+		// normal transcript key (distinct from the tlang key); its presence confirms the
+		// native path is served through GetTranscript rather than the tlang path.
+		normalKey := fmt.Sprintf("%sabc123video:ja", models.CacheKeyPrefixTranscript)
+		if _, found := base.cache.Get(context.Background(), normalKey); !found {
+			t.Errorf("expected native retrieval to populate normal transcript cache key %q", normalKey)
+		}
+	})
+}
+
+// newTranslateTestServer serves a YouTube-like watch page whose caption tracks point
+// back at the same server's /api/timedtext endpoint. onTimedtext, when non-nil, is
+// invoked for each timedtext request so tests can assert on the query parameters.
+func newTranslateTestServer(t *testing.T, tracks []CaptionTrack, onTimedtext func(*http.Request)) *httptest.Server {
+	t.Helper()
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/timedtext"):
+			if onTimedtext != nil {
+				onTimedtext(r)
+			}
+			w.Header().Set("Content-Type", "application/xml")
+			_, _ = w.Write([]byte(jaTranslatedXML))
+		case strings.HasPrefix(r.URL.Path, "/watch"):
+			// Point caption track baseUrls at this server's timedtext endpoint.
+			resolved := make([]CaptionTrack, len(tracks))
+			for i, tr := range tracks {
+				tr.BaseURL = server.URL + "/api/timedtext?v=abc123video&lang=" + tr.LanguageCode
+				resolved[i] = tr
+			}
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = w.Write([]byte(buildWatchHTML(t, resolved)))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	return server
+}
+
+// newTranslateTestService returns a Service whose HTTP client redirects all requests
+// (including the hardcoded www.youtube.com watch URL) to the test server.
+func newTranslateTestService(t *testing.T, server *httptest.Server) *Service {
+	t.Helper()
+	s := newTestService()
+	target, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("failed to parse server URL: %v", err)
+	}
+	s.httpClient.Transport = &hostRewriteTransport{
+		base:   http.DefaultTransport,
+		target: target,
+	}
+	return s
 }
