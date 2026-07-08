@@ -218,6 +218,7 @@ type MCPToolCallParams struct {
 // MCPToolResult represents the result of a tool call
 type MCPToolResult struct {
 	Content []MCPContent `json:"content"`
+	IsError bool         `json:"isError,omitempty"`
 }
 
 // MCPContent represents content in MCP format

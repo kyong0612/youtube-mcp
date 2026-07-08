@@ -179,15 +179,39 @@ func (s *Server) handleCallTool(ctx context.Context, request models.MCPRequest) 
 
 	result, err := s.executeTool(toolCtx, toolCall.Name, toolCall.Arguments)
 	if err != nil {
+		// Boundary between the two MCP error mechanisms:
+		//   - Structural problems with the call stay as JSON-RPC protocol
+		//     errors: invalid/missing arguments (-32602) and unknown tool
+		//     (-32601). These mean the request itself was malformed.
+		//   - Genuine tool execution failures (no transcript, network, etc.)
+		//     are returned as a normal tool result with isError=true so the
+		//     LLM can read and recover from them.
 		if mcpErr, ok := err.(*models.MCPError); ok {
-			return &models.MCPResponse{
-				JSONRPC: "2.0",
-				ID:      request.ID,
-				Error:   mcpErr,
+			switch mcpErr.Code {
+			case models.MCPErrorCodeInvalidParams, models.MCPErrorCodeMethodNotFound:
+				return &models.MCPResponse{
+					JSONRPC: "2.0",
+					ID:      request.ID,
+					Error:   mcpErr,
+				}
 			}
 		}
 
-		return s.errorResponse(request.ID, models.MCPErrorCodeInternalError, err.Error())
+		toolResult := models.MCPToolResult{
+			IsError: true,
+			Content: []models.MCPContent{
+				{
+					Type: "text",
+					Text: toolErrorText(err),
+				},
+			},
+		}
+
+		return &models.MCPResponse{
+			JSONRPC: "2.0",
+			ID:      request.ID,
+			Result:  toolResult,
+		}
 	}
 
 	// Format result as MCP tool result
@@ -841,6 +865,31 @@ func (s *Server) mapToStruct(input map[string]any, output any) error {
 		return err
 	}
 	return json.Unmarshal(jsonBytes, output)
+}
+
+// toolErrorText builds a human-readable error message for a failed tool
+// execution. The text is returned to the LLM inside an isError tool result.
+func toolErrorText(err error) string {
+	switch e := err.(type) {
+	case *models.MCPError:
+		msg := e.Message
+		if data, ok := e.Data.(map[string]any); ok {
+			if t, ok := data["type"].(string); ok && t != "" {
+				msg = fmt.Sprintf("%s (type: %s)", msg, t)
+			}
+			if v, ok := data["video_id"].(string); ok && v != "" {
+				msg = fmt.Sprintf("%s (video_id: %s)", msg, v)
+			}
+		}
+		return msg
+	case *models.TranscriptError:
+		if e.Type != "" {
+			return fmt.Sprintf("%s (type: %s)", e.Message, e.Type)
+		}
+		return e.Message
+	default:
+		return err.Error()
+	}
 }
 
 func (s *Server) errorResponse(id any, code int, message string) *models.MCPResponse {

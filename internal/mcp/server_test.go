@@ -262,6 +262,176 @@ func TestHandleMCP_CallTool_GetTranscript(t *testing.T) {
 	}
 }
 
+func TestHandleMCP_CallTool_ExecutionError(t *testing.T) {
+	mockYT := &mockYouTubeService{
+		getTranscriptFunc: func(ctx context.Context, videoID string, languages []string, preserveFormatting bool) (*models.TranscriptResponse, error) {
+			return nil, &models.TranscriptError{
+				Type:    models.ErrorTypeNoTranscriptFound,
+				Message: "No transcript found for video",
+				VideoID: videoID,
+			}
+		},
+	}
+
+	cfg := config.MCPConfig{
+		MaxRequestSize: 5 * 1024 * 1024, // 5MB
+		RequestTimeout: 60 * time.Second,
+		Tools: map[string]bool{
+			"get_transcript": true,
+		},
+	}
+	logger := slog.Default()
+
+	server := NewServer(mockYT, cfg, logger)
+
+	request := models.MCPRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  models.MCPMethodCallTool,
+		Params: map[string]any{
+			"name": "get_transcript",
+			"arguments": map[string]any{
+				"video_identifier": "test123",
+			},
+		},
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+	req := httptest.NewRequest("POST", "/mcp", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.HandleMCP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", rec.Code)
+	}
+
+	var response models.MCPResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Failed to parse response: %v", err)
+	}
+
+	// Tool execution errors must be reported as a tool result with
+	// isError=true, never as a protocol-level JSON-RPC error.
+	if response.Error != nil {
+		t.Errorf("Expected no top-level error, got %v", response.Error)
+	}
+
+	result, ok := response.Result.(map[string]any)
+	if !ok {
+		t.Fatal("Expected result to be a map")
+	}
+
+	isErr, ok := result["isError"].(bool)
+	if !ok || !isErr {
+		t.Errorf("Expected isError to be true, got %v", result["isError"])
+	}
+
+	content, ok := result["content"].([]any)
+	if !ok || len(content) == 0 {
+		t.Fatal("Expected non-empty content array")
+	}
+
+	first, ok := content[0].(map[string]any)
+	if !ok {
+		t.Fatal("Expected content item to be a map")
+	}
+
+	text, ok := first["text"].(string)
+	if !ok || text == "" {
+		t.Error("Expected non-empty error text in content")
+	}
+}
+
+func TestHandleRawMessage_CallTool_ExecutionError(t *testing.T) {
+	mockYT := &mockYouTubeService{
+		getTranscriptFunc: func(ctx context.Context, videoID string, languages []string, preserveFormatting bool) (*models.TranscriptResponse, error) {
+			return nil, &models.TranscriptError{
+				Type:    models.ErrorTypeNoTranscriptFound,
+				Message: "No transcript found for video",
+				VideoID: videoID,
+			}
+		},
+	}
+
+	cfg := config.MCPConfig{
+		MaxRequestSize: 5 * 1024 * 1024, // 5MB
+		RequestTimeout: 60 * time.Second,
+		Tools: map[string]bool{
+			"get_transcript": true,
+		},
+	}
+	server := NewServer(mockYT, cfg, slog.Default())
+
+	msg := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_transcript","arguments":{"video_identifier":"test123"}}}`)
+
+	raw, err := server.HandleRawMessage(context.Background(), msg)
+	if err != nil {
+		t.Fatalf("HandleRawMessage returned error: %v", err)
+	}
+
+	resp, ok := raw.(*models.MCPResponse)
+	if !ok {
+		t.Fatalf("Expected *models.MCPResponse, got %T", raw)
+	}
+
+	// Same boundary as the HTTP transport: execution failures are isError
+	// tool results, not protocol errors.
+	if resp.Error != nil {
+		t.Errorf("Expected no protocol error, got %v", resp.Error)
+	}
+
+	toolResult, ok := resp.Result.(models.MCPToolResult)
+	if !ok {
+		t.Fatalf("Expected result to be MCPToolResult, got %T", resp.Result)
+	}
+
+	if !toolResult.IsError {
+		t.Error("Expected isError to be true for execution failure")
+	}
+
+	if len(toolResult.Content) == 0 || toolResult.Content[0].Text == "" {
+		t.Error("Expected non-empty error text in content")
+	}
+}
+
+func TestHandleRawMessage_CallTool_InvalidArgs(t *testing.T) {
+	mockYT := &mockYouTubeService{}
+	cfg := config.MCPConfig{
+		MaxRequestSize: 5 * 1024 * 1024, // 5MB
+		RequestTimeout: 60 * time.Second,
+		Tools: map[string]bool{
+			"get_transcript": true,
+		},
+	}
+	server := NewServer(mockYT, cfg, slog.Default())
+
+	// Missing required video_identifier must surface as an invalid-params
+	// protocol error on the stdio transport too.
+	msg := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_transcript","arguments":{"languages":["en"]}}}`)
+
+	raw, err := server.HandleRawMessage(context.Background(), msg)
+	if err != nil {
+		t.Fatalf("HandleRawMessage returned error: %v", err)
+	}
+
+	resp, ok := raw.(*models.MCPResponse)
+	if !ok {
+		t.Fatalf("Expected *models.MCPResponse, got %T", raw)
+	}
+
+	if resp.Error == nil {
+		t.Fatal("Expected invalid params protocol error")
+	}
+
+	if resp.Error.Code != models.MCPErrorCodeInvalidParams {
+		t.Errorf("Expected invalid params error (%d), got %d", models.MCPErrorCodeInvalidParams, resp.Error.Code)
+	}
+}
+
 func TestHandleMCP_InvalidMethod(t *testing.T) {
 	mockYT := &mockYouTubeService{}
 	cfg := config.MCPConfig{
@@ -508,11 +678,14 @@ func TestValidation(t *testing.T) {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
 
+	// Missing/invalid required arguments are a structural problem with the
+	// request, so per the MCP spec they are returned as a JSON-RPC
+	// invalid-params (-32602) protocol error, not as an isError tool result.
 	if response.Error == nil {
-		t.Error("Expected validation error")
+		t.Fatal("Expected invalid params protocol error")
 	}
 
 	if response.Error.Code != models.MCPErrorCodeInvalidParams {
-		t.Errorf("Expected invalid params error, got %d", response.Error.Code)
+		t.Errorf("Expected invalid params error (%d), got %d", models.MCPErrorCodeInvalidParams, response.Error.Code)
 	}
 }
