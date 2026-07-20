@@ -1,0 +1,72 @@
+# Smithery configuration for the YouTube Transcript MCP server.
+#
+# This server speaks the Model Context Protocol over stdio
+# (entry point: ./cmd/mcp, binary: youtube-mcp-stdio).
+#
+# SCHEMA NOTE (verified against the current Smithery docs via the context7 MCP
+# tool on 2026-06-30): the `startCommand.type: stdio` + `commandFunction` shape
+# below is the LEGACY Smithery deploy schema. The current docs document only
+# `runtime: "typescript"` and `runtime: "container"` (the latter with
+# `startCommand.type: "http"`), and Smithery discontinued HOSTED stdio
+# deployments (announced ~2025-09-07). This manifest is therefore appropriate
+# for a registry LISTING / local install of the stdio binary, but it will NOT
+# produce a working Smithery-hosted cloud deployment as-is.
+#
+# To make a hosted deploy work, cmd/server would first need to implement the
+# MCP Streamable HTTP transport (today it exposes only single-shot JSON-RPC
+# POST at /mcp, which is not Streamable HTTP), after which this file would move
+# to `runtime: container` + `startCommand.type: http` + a `build:` section.
+#
+# DOCKERFILE PREREQUISITE: the repo root Dockerfile builds ./cmd/server (binary
+# `youtube-transcript-mcp`, the HTTP server), NOT the stdio binary
+# `youtube-mcp-stdio`. The `commandFunction` below assumes `youtube-mcp-stdio`
+# has been built and is on PATH (e.g. `go build -o youtube-mcp-stdio ./cmd/mcp`);
+# the root Dockerfile alone does not provide it.
+#
+# The configSchema maps each field to an environment variable consumed by
+# internal/config/config.go (LOG_LEVEL, YOUTUBE_DEFAULT_LANGUAGES, CACHE_ENABLED).
+startCommand:
+  type: stdio
+  # JSON Schema describing the configuration users can supply when launching
+  # the server. Each field maps to an environment variable read by the server.
+  configSchema:
+    type: object
+    properties:
+      logLevel:
+        type: string
+        title: Log Level
+        description: Logging verbosity. Maps to the LOG_LEVEL environment variable.
+        enum:
+          - debug
+          - info
+          - warn
+          - error
+        default: info
+      defaultLanguages:
+        type: string
+        title: Default Languages
+        description: >-
+          Comma-separated preferred transcript language codes, e.g. "en,ja,es".
+          Maps to the YOUTUBE_DEFAULT_LANGUAGES environment variable.
+        default: en
+      cacheEnabled:
+        type: boolean
+        title: Cache Enabled
+        description: Enable in-memory transcript caching. Maps to the CACHE_ENABLED environment variable.
+        default: true
+  exampleConfig:
+    logLevel: info
+    defaultLanguages: en,ja
+    cacheEnabled: true
+  # Returns the command Smithery runs to start the stdio server, with the
+  # selected configuration injected as environment variables.
+  commandFunction: |
+    (config) => ({
+      command: 'youtube-mcp-stdio',
+      args: [],
+      env: {
+        LOG_LEVEL: config.logLevel || 'info',
+        YOUTUBE_DEFAULT_LANGUAGES: config.defaultLanguages || 'en',
+        CACHE_ENABLED: String(config.cacheEnabled !== false)
+      }
+    })
