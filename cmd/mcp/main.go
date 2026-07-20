@@ -19,7 +19,7 @@ import (
 
 // Version information (set during build)
 var (
-	Version   = "1.0.0"
+	Version   = "dev"
 	BuildTime = "unknown"
 	GitCommit = "unknown"
 )
