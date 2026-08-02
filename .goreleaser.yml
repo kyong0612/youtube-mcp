@@ -17,6 +17,7 @@ before:
     - go test -v ./...
 
 builds:
+  # HTTP server binary (used by Docker image / standalone HTTP mode)
   - id: youtube-mcp
     main: ./cmd/server
     binary: youtube-mcp
@@ -36,7 +37,29 @@ builds:
       - -X main.GitCommit={{.ShortCommit}}
     mod_timestamp: '{{ .CommitTimestamp }}'
 
+  # STDIO binary consumed by MCP clients (Claude Desktop / Cursor / Claude Code)
+  - id: youtube-mcp-stdio
+    main: ./cmd/mcp
+    binary: youtube-mcp-stdio
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.BuildTime={{.Date}}
+      - -X main.GitCommit={{.ShortCommit}}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
 archives:
+  # No `ids`/`builds` filter is set, so GoReleaser packages ALL builds by default,
+  # i.e. each archive contains both `youtube-mcp` (HTTP) and `youtube-mcp-stdio` (MCP stdio).
   - id: youtube-mcp
     name_template: >-
       {{ .ProjectName }}_
@@ -47,7 +70,7 @@ archives:
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     files:
       - README.md
       - LICENSE*
@@ -59,7 +82,7 @@ checksum:
   algorithm: sha256
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 
 changelog:
   sort: asc
@@ -135,44 +158,62 @@ nfpms:
         file_info:
           mode: 0644
 
-brews:
-  - name: youtube-mcp
-    repository:
-      owner: kimkiyong
-      name: homebrew-tap
-      branch: main
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    commit_author:
-      name: goreleaserbot
-      email: bot@goreleaser.com
-    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-    homepage: "https://github.com/kimkiyong/youtube-mcp"
-    description: "YouTube Transcript MCP Server"
-    license: "MIT"
-    skip_upload: auto
-    test: |
-      system "#{bin}/youtube-mcp", "--version"
-    install: |
-      bin.install "youtube-mcp"
-
-scoops:
-  - repository:
-      owner: kimkiyong
-      name: scoop-bucket
-      branch: main
-      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
-    commit_author:
-      name: goreleaserbot
-      email: bot@goreleaser.com
-    commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
-    homepage: "https://github.com/kimkiyong/youtube-mcp"
-    description: "YouTube Transcript MCP Server"
-    license: "MIT"
-    skip_upload: auto
+# NOTE: brews/scoops are DISABLED for now.
+# They publish to EXTERNAL tap repositories owned by a different account
+# (kimkiyong/homebrew-tap, kimkiyong/scoop-bucket) and require Personal Access
+# Token secrets (HOMEBREW_TAP_GITHUB_TOKEN / SCOOP_BUCKET_GITHUB_TOKEN) that do
+# not currently exist. If left enabled, a missing token / missing tap repo makes
+# the whole `goreleaser release` run hard-fail. They are commented out so core
+# release artifacts (binaries, archives, checksums, GHCR image) can ship.
+#
+# To re-enable:
+#   1. Create the tap repositories (e.g. kyong0612/homebrew-tap and
+#      kyong0612/scoop-bucket) and update the `owner` fields below accordingly.
+#   2. Create a GitHub PAT with `repo` scope on those repositories and register
+#      it as Actions secrets HOMEBREW_TAP_GITHUB_TOKEN and SCOOP_BUCKET_GITHUB_TOKEN.
+#   3. Expose those secrets to the GoReleaser step (env:) in .github/workflows/release.yml.
+#   4. Uncomment the blocks below.
+#
+# brews:
+#   - name: youtube-mcp
+#     repository:
+#       owner: kimkiyong
+#       name: homebrew-tap
+#       branch: main
+#       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+#     commit_author:
+#       name: goreleaserbot
+#       email: bot@goreleaser.com
+#     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+#     homepage: "https://github.com/kyong0612/youtube-mcp"
+#     description: "YouTube Transcript MCP Server"
+#     license: "MIT"
+#     skip_upload: auto
+#     test: |
+#       system "#{bin}/youtube-mcp", "--version"
+#     install: |
+#       bin.install "youtube-mcp"
+#
+# scoops:
+#   - repository:
+#       owner: kimkiyong
+#       name: scoop-bucket
+#       branch: main
+#       token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
+#     commit_author:
+#       name: goreleaserbot
+#       email: bot@goreleaser.com
+#     commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+#     homepage: "https://github.com/kyong0612/youtube-mcp"
+#     description: "YouTube Transcript MCP Server"
+#     license: "MIT"
+#     skip_upload: auto
 
 release:
   github:
-    owner: kimkiyong
+    # The actual upstream repository is kyong0612/youtube-mcp.
+    # The GitHub Release MUST be published there.
+    owner: kyong0612
     name: youtube-mcp
   draft: false
   prerelease: auto
