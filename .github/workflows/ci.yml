@@ -178,7 +178,7 @@ jobs:
         gosec -fmt sarif -out gosec-results.sarif -severity medium ./... || true
         
     - name: Upload Gosec results
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: gosec-results.sarif
         category: gosec
